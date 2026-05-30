@@ -4,8 +4,7 @@
   "version": "2.0.0",
   "type": "module",
   "workspaces": [
-    ".",
-    "partyserver"
+    "."
   ],
   "overrides": {
     "react": "19.2.0",
