@@ -5,6 +5,8 @@ export interface DailySpinsResponse {
   spinnerAddress: string;
   prizeAmount: number;
   createdAt: number;
+  lastSpinAt?: number | null;
+  totalWon?: number;
 }
 
 export async function setDailySpins(

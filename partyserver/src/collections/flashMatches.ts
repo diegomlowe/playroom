@@ -6,12 +6,18 @@ export interface FlashMatchesResponse {
   player2?: string | null;
   player3?: string | null;
   player4?: string | null;
+  playerCount: number;
   state: string;
   flashMomentMs?: string | null;
   createdAt: number;
   startedAt?: number | null;
   winner?: string | null;
   secondPlace?: string | null;
+  winnerDeltaMs?: number | null;
+  secondPlaceDeltaMs?: number | null;
+  ts: number;
+  buyIn: string;
+  buyInCurrency?: string;
 }
 
 export async function setFlashMatches(
@@ -77,12 +83,18 @@ export async function getFlashMatches(matchId: string): Promise<FlashMatchesResp
       player2: match.player2,
       player3: match.player3,
       player4: match.player4,
+      playerCount: match.playerCount || 1,
       state: match.state,
       flashMomentMs: match.flashMomentMs?.toString() || null,
       createdAt: match.createdAt.getTime(),
       startedAt: match.startedAt?.getTime() || null,
       winner: match.winner,
       secondPlace: match.secondPlace,
+      winnerDeltaMs: match.winnerDeltaMs || null,
+      secondPlaceDeltaMs: match.secondPlaceDeltaMs || null,
+      ts: match.ts?.getTime ? match.ts.getTime() : 0,
+      buyIn: match.buyIn?.toString() || '0',
+      buyInCurrency: match.buyInCurrency || 'SOL',
     };
   } catch (error) {
     console.error(`Error getting FlashMatches:`, error);

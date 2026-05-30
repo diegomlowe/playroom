@@ -12,6 +12,7 @@ export interface CoinFlipMatchesResponse {
   buyInCurrency: string;
   vrfResult?: string | null;
   txSignature?: string | null;
+  ts: number;
 }
 
 export async function setCoinFlipMatches(
@@ -80,6 +81,7 @@ export async function getCoinFlipMatches(matchId: string): Promise<CoinFlipMatch
       buyInCurrency: match.buyInCurrency,
       vrfResult: match.vrfResult,
       txSignature: match.txSignature,
+      ts: match.createdAt.getTime(),
     };
   } catch (error) {
     console.error(`Error getting CoinFlipMatches:`, error);

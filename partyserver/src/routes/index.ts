@@ -266,7 +266,7 @@ export function registerRoutes(app: Hono): void {
     for (const addr of allAddresses) {
       const tap = taps.find((t) => t.player === addr);
       if (!tap) continue;
-      const delta = Math.abs((tap.tapTimeMs as number) - flashMomentMs);
+      const delta = Math.abs(Number(tap.tapTime) - flashMomentMs);
       if (delta < winnerDeltaMs) {
         secondPlaceDelta = winnerDeltaMs;
         secondPlace = winner;

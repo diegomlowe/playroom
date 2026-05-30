@@ -4,6 +4,7 @@ export interface DailySpinPoolResponse {
   id: string;
   balance: string;
   updatedAt: number;
+  totalDistributed?: string;
 }
 
 export async function setDailySpinPool(
