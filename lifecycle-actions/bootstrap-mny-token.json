@@ -1,0 +1,40 @@
+{
+  "version": "1",
+  "kind": "bootstrap",
+  "scope": "mny-token",
+  "executionTarget": "client",
+  "targetEnvironments": ["mock", "preview", "live"],
+  "bootstrapType": "deployment-idempotent",
+  "description": "Initialize the MNY token record and the daily spin pool. Idempotent — safe to re-run.",
+  "steps": [
+    {
+      "op": "ensure",
+      "expr": "get(/tprToken/pppToken) == null"
+    },
+    {
+      "op": "set",
+      "path": "tprToken/pppToken",
+      "data": {
+        "creator": "2NjUmgSy7KJ8XV6jTuzxfCwU32JgRpZ1n6Sugwo5t6eP",
+        "name": "money",
+        "symbol": "MNY",
+        "supply": 1000000000000,
+        "ts": "Time.Now"
+      }
+    },
+    {
+      "op": "ensure",
+      "expr": "get(/dailySpinPool/main) == null"
+    },
+    {
+      "op": "set",
+      "path": "dailySpinPool/main",
+      "data": {
+        "balance": 0,
+        "totalDistributed": 0,
+        "spinCount": 0,
+        "ts": "Time.Now"
+      }
+    }
+  ]
+}

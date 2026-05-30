@@ -1,0 +1,249 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+// ─────────────────────────────────────────────────────────────
+// GAMES (TapWars)
+// ─────────────────────────────────────────────────────────────
+
+model Game {
+  id                String    @id @default(cuid())
+  creator           String    @db.VarChar(255)
+  player2           String?   @db.VarChar(255)
+  player3           String?   @db.VarChar(255)
+  player4           String?   @db.VarChar(255)
+  playerCount       Int       @default(1)
+  state             String    @default("waiting") // waiting, playing, resolved
+  createdAt         DateTime  @default(now())
+  startedAt         DateTime?
+  winner            String?   @db.VarChar(255)
+  secondPlace       String?   @db.VarChar(255)
+  winnerScore       Int       @default(0)
+  secondPlaceScore  Int       @default(0)
+  buyIn             BigInt
+  buyInCurrency     String    @default("SOL") // SOL or MNY
+  gameType          String?
+  txSignature       String?   @db.VarChar(255) // Solana tx hash (Phase 4)
+
+  // Relations
+  submissions GameSubmission[]
+
+  @@index([creator])
+  @@index([state])
+  @@index([createdAt])
+}
+
+model GameSubmission {
+  id         String   @id @default(cuid())
+  gameId     String
+  player     String   @db.VarChar(255)
+  tapCount   Int
+  submittedAt DateTime @default(now())
+
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, player])
+  @@index([gameId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// COINFLIP
+// ─────────────────────────────────────────────────────────────
+
+model CoinFlipMatch {
+  id              String    @id @default(cuid())
+  creator         String    @db.VarChar(255)
+  opponent        String?   @db.VarChar(255)
+  tier            Int       // 1, 2, or 3
+  buyIn           BigInt
+  state           String    @default("waiting") // waiting, resolved, cancelled
+  winner          String?   @db.VarChar(255)
+  createdAt       DateTime  @default(now())
+  buyInCurrency   String    @default("SOL")
+  vrfResult       String?   @db.VarChar(255) // Phase 4: VRF proof
+  txSignature     String?   @db.VarChar(255) // Phase 4: Payout tx
+
+  @@index([creator])
+  @@index([state])
+  @@index([createdAt])
+}
+
+// ─────────────────────────────────────────────────────────────
+// RPS (Rock Paper Scissors)
+// ─────────────────────────────────────────────────────────────
+
+model RpsMatch {
+  id              String    @id @default(cuid())
+  creator         String    @db.VarChar(255)
+  opponent        String    @db.VarChar(255)
+  buyInLamports   BigInt
+  status          String    @default("waiting") // waiting, active, complete, abandoned
+  creatorWins     Int       @default(0)
+  opponentWins    Int       @default(0)
+  currentRound    Int       @default(1)
+  winner          String?   @db.VarChar(255)
+  createdAt       DateTime  @default(now())
+  buyInCurrency   String    @default("SOL")
+  lastActivityAt  DateTime  @default(now())
+  txSignature     String?   @db.VarChar(255) // Phase 4
+
+  rounds RpsRound[]
+
+  @@index([creator])
+  @@index([status])
+  @@index([lastActivityAt])
+}
+
+model RpsRound {
+  id              String    @id @default(cuid())
+  matchId         String
+  roundNumber     Int
+  creatorCommit   String?   @db.VarChar(255) // SHA-256 hash
+  creatorReveal   String?   @db.VarChar(255) // rock, paper, scissors
+  opponentCommit  String?   @db.VarChar(255)
+  opponentReveal  String?   @db.VarChar(255)
+  winner          String?   @db.VarChar(255)
+  createdAt       DateTime  @default(now())
+
+  match RpsMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, roundNumber])
+  @@index([matchId])
+}
+
+// ─────────────────────────────────────────────────────────────
+// FLASHTAP
+// ─────────────────────────────────────────────────────────────
+
+model FlashMatch {
+  id            String    @id @default(cuid())
+  creator       String    @db.VarChar(255)
+  player2       String?   @db.VarChar(255)
+  player3       String?   @db.VarChar(255)
+  player4       String?   @db.VarChar(255)
+  state         String    @default("waiting") // waiting, playing, resolved
+  flashMomentMs BigInt?
+  createdAt     DateTime  @default(now())
+  startedAt     DateTime?
+  winner        String?   @db.VarChar(255)
+  secondPlace   String?   @db.VarChar(255)
+
+  taps FlashTap[]
+
+  @@index([creator])
+  @@index([state])
+}
+
+model FlashTap {
+  id            String    @id @default(cuid())
+  matchId       String
+  player        String    @db.VarChar(255)
+  tapTime       BigInt
+  reactionTime  BigInt?   // calculated: tapTime - flashMomentMs
+
+  match FlashMatch @relation(fields: [matchId], references: [id], onDelete: Cascade)
+
+  @@unique([matchId, player])
+}
+
+// ─────────────────────────────────────────────────────────────
+// DAILY SPIN
+// ─────────────────────────────────────────────────────────────
+
+model DailySpin {
+  id               String    @id @default(cuid())
+  spinnerAddress   String    @db.VarChar(255)
+  prizeAmount      Float     // MNY
+  createdAt        DateTime  @default(now())
+
+  @@index([spinnerAddress, createdAt])
+}
+
+model DailySpinPool {
+  id               String    @id @default("main")
+  balance          BigInt    @default(100000000000) // 100k MNY in base units
+  updatedAt        DateTime  @default(now()) @updatedAt
+}
+
+model SpinPayout {
+  id               String    @id @default(cuid())
+  spinId           String
+  playerAddress    String    @db.VarChar(255)
+  amount           BigInt
+  createdAt        DateTime  @default(now())
+
+  @@index([playerAddress])
+}
+
+// ─────────────────────────────────────────────────────────────
+// STAKING & FEES
+// ─────────────────────────────────────────────────────────────
+
+model MnyStake {
+  id               String    @id @default(cuid())
+  stakerAddress    String    @db.VarChar(255) @unique
+  amountStaked     BigInt    @default(0)
+  stakedAt         DateTime  @default(now())
+  unstakedAt       DateTime?
+
+  @@index([stakerAddress])
+}
+
+model FeePoolDistribution {
+  id               String    @id @default(cuid())
+  stakerAddress    String    @db.VarChar(255)
+  amountDistributed BigInt
+  epochHour        Int
+  distributedAt    DateTime  @default(now())
+
+  @@unique([epochHour, stakerAddress]) // Idempotent
+  @@index([stakerAddress])
+}
+
+// ─────────────────────────────────────────────────────────────
+// TOKEN UNLOCKS
+// ─────────────────────────────────────────────────────────────
+
+model TokenUnlock {
+  id               String    @id @default(cuid())
+  label            String    @db.VarChar(255)
+  totalAmount      BigInt
+  unlockedAt       DateTime?
+  index            Int       @unique
+
+  @@index([index])
+}
+
+// ─────────────────────────────────────────────────────────────
+// USERS
+// ─────────────────────────────────────────────────────────────
+
+model User {
+  id               String    @id @default(cuid())
+  address          String    @db.VarChar(255) @unique
+  username         String?   @db.VarChar(255)
+  createdAt        DateTime  @default(now())
+  lastSeenAt       DateTime  @default(now()) @updatedAt
+
+  @@index([address])
+}
+
+// ─────────────────────────────────────────────────────────────
+// TOKEN INFO
+// ─────────────────────────────────────────────────────────────
+
+model TokenInfo {
+  id               String    @id @default("mny")
+  mint             String    @db.VarChar(255)
+  supply           BigInt
+  decimals         Int
+  name             String    @db.VarChar(255)
+}

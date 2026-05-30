@@ -1,0 +1,25 @@
+{
+  "tasks": [
+    {
+      "name": "auto-cancel-stale-matches",
+      "cron": "*/2 * * * *",
+      "handler": "./src/heartbeat/auto-cancel-stale-matches.ts",
+      "enabled": true,
+      "description": "Auto-cancel coinFlip matches that have been waiting more than 10 minutes with no opponent, triggering a buyIn refund to the creator."
+    },
+    {
+      "name": "distribute-fee-pool",
+      "cron": "0 * * * *",
+      "handler": "./src/heartbeat/distribute-fee-pool.ts",
+      "enabled": true,
+      "description": "Hourly fee-pool distribution. Snapshots all mnyStakes with amountStaked > 0 and writes one feePoolDistributions record per staker, atomically transferring their pro-rata share of SOL from the FEE_POOL_ID PDA to their wallet."
+    },
+    {
+      "name": "resolve-coinflip-matches",
+      "cron": "*/1 * * * *",
+      "handler": "./src/heartbeat/resolve-coinflip-matches.ts",
+      "enabled": true,
+      "description": "Resolve waiting coinFlip matches that have an opponent. Picks winner deterministically and triggers payout hook."
+    }
+  ]
+}

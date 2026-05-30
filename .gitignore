@@ -1,0 +1,52 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# Testing
+coverage/
+
+# Production
+dist/
+build/
+.env.local
+.env.*.local
+
+# Misc
+.DS_Store
+*.pem
+.mcp.json
+modified-files.json
+poof-user-deps.json
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Bun
+.bun-version
+bunfig.toml
+
+# Build output
+partyserver/.wrangler/
+partyserver/dist/
+partyserver/build/
+
+# Vite
+vite-plugin-build-notifier.d.ts
+vite.config.d.ts
+
+# Prisma
+.env
+prisma/.env

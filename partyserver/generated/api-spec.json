@@ -1,0 +1,57 @@
+{
+  "info": {
+    "title": "API",
+    "version": "1.0.0",
+    "generatedAt": "2026-05-29T22:11:55.837Z"
+  },
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/health",
+      "description": "Health check",
+      "authentication": {
+        "required": false
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/games/:gameId/finalize",
+      "description": "Finalize a game: compute winner from submissions, resolve on-chain payout",
+      "authentication": {
+        "required": true
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/flashtap/:matchId/start",
+      "description": "Start a FlashTap match: set flashMomentMs and transition to playing",
+      "authentication": {
+        "required": true
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/flashtap/:matchId/resolve",
+      "description": "Resolve a FlashTap match: determine winner by closest reaction time",
+      "authentication": {
+        "required": true
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/daily-spin",
+      "description": "Perform a daily spin: check cooldown, pick weighted prize, update records and pool",
+      "authentication": {
+        "required": true
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/api/coinflip/resolve",
+      "description": "Resolve a coinflip match: deterministic winner, vault-signed payout",
+      "authentication": {
+        "required": true
+      }
+    }
+  ]
+}

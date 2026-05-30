@@ -1,0 +1,821 @@
+{
+  "adminFiles/$fileId": {
+    "type": "storage",
+    "description": "Admin-only file storage",
+    "rules": {
+      "read": "true",
+      "create": "@user.address == @constants.ADMIN_ADDRESS",
+      "update": "false",
+      "delete": "@user.address == @constants.ADMIN_ADDRESS"
+    }
+  },
+  "appFiles/$fileId": {
+    "type": "storage",
+    "description": "App user uploaded files",
+    "rules": {
+      "read": "true",
+      "create": "@user.address != null",
+      "update": "false",
+      "delete": "@user.address == @constants.ADMIN_ADDRESS"
+    }
+  },
+  "commonQueries/$queryId": {
+    "description": "Read-only queries for wallet balances and swap quotes. Supports SOL/USDC/SPL token balance lookups, Jupiter swap quotes, and Meteora dynamic bonding curve quotes.",
+    "operationDetails": {
+      "read": "Anyone can use these queries: (1) Balance queries - check SOL, USDC, or any SPL token balance for any wallet address. (2) Jupiter swap quotes - get expected output amounts for token swaps via Jupiter aggregator. (3) Meteora swap quotes - get expected output amounts for Meteora dynamic bonding curve pools."
+    },
+    "onchain": false,
+    "fields": {},
+    "rules": {
+      "read": "true",
+      "create": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "queries": {
+      "solBalance": {
+        "description": "Get SOL balance for a wallet address in lamports (1 SOL = 1,000,000,000 lamports). Pass walletAddress as parameter.",
+        "returnType": "UInt",
+        "query": "@TokenPlugin.getBalance(@newData.walletAddress, @constants.SOL)"
+      },
+      "usdcBalance": {
+        "description": "Get USDC balance for a wallet address in base units (1 USDC = 1,000,000 base units with 6 decimals). Pass walletAddress as parameter.",
+        "returnType": "UInt",
+        "query": "@TokenPlugin.getBalance(@newData.walletAddress, @constants.USDC)"
+      },
+      "tokenBalance": {
+        "description": "Get balance for any SPL token mint for a wallet address. Pass walletAddress and tokenMint as parameters. Returns balance in the token's smallest units based on its decimals.",
+        "returnType": "UInt",
+        "query": "@TokenPlugin.getBalance(@newData.walletAddress, @newData.tokenMint)"
+      },
+      "jupiterSwapQuote": {
+        "description": "Get a Jupiter swap quote for exchanging tokens. Pass inputMint (token to sell, use @constants.SOL for native SOL), outputMint (token to buy), and amount (in smallest units like lamports). Returns the expected output amount.",
+        "returnType": "UInt",
+        "query": "@DeFiPlugin.getSwapQuote(@newData.inputMint, @newData.outputMint, @newData.amount)"
+      },
+      "meteoraSwapQuote": {
+        "description": "Get a Meteora dynamic bonding curve swap quote. Pass tokenMintAddress (the pool's base token), tokenToSwapInMintAddress (token to swap in, use @constants.SOL for native SOL), and tokenAmount (in smallest units). Returns the expected output amount.",
+        "returnType": "UInt",
+        "query": "@DeFiPlugin.getMeteoraSwapQuote(@newData.tokenMintAddress, @newData.tokenToSwapInMintAddress, @newData.tokenAmount)"
+      }
+    }
+  },
+  "games/$gameId": {
+    "description": "4-player tap-race gambling game with per-game escrow PDA. Players pay tiered buy-in (Casual 0.01, Standard 0.1, High Stakes 0.5 SOL) to join. Winner gets 75% of pool, second gets 20%, platform takes 5% fee. If no joiners have entered (playerCount == 1), the match can be cancelled by either the creator or PROJECT_VAULT_ADDRESS (cron timeout), and the creator's buy-in is refunded from the escrow PDA.",
+    "fields": {
+      "creator": "Address!",
+      "player2": "Address?",
+      "player3": "Address?",
+      "player4": "Address?",
+      "playerCount": "Int",
+      "state": "String",
+      "createdAt": "Int!",
+      "startedAt": "Int",
+      "winner": "Address?",
+      "secondPlace": "Address?",
+      "winnerScore": "Int",
+      "secondPlaceScore": "Int",
+      "gameType": "String?",
+      "buyIn": "UInt!",
+      "buyInCurrency": "String!"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "@user.address != @constants.PROJECT_VAULT_ADDRESS && @newData.creator == @user.address && @newData.playerCount == 1 && @newData.state == 'waiting' && @newData.winnerScore == 0 && @newData.secondPlaceScore == 0 && ((@newData.buyInCurrency == 'SOL' && (@newData.buyIn == 10000000 || @newData.buyIn == 100000000 || @newData.buyIn == 500000000)) || (@newData.buyInCurrency == 'MNY' && @newData.buyIn > 0))",
+      "update": "(@data.state == 'waiting' && @user.address != @constants.PROJECT_VAULT_ADDRESS && @user.address != @data.creator && @user.address != @data.player2 && @user.address != @data.player3 && @user.address != @data.player4 && @newData.playerCount == @data.playerCount + 1 && @newData.gameType == @data.gameType && @newData.buyIn == @data.buyIn && @newData.buyInCurrency == @data.buyInCurrency && ((@data.playerCount == 1 && @newData.player2 == @user.address && @newData.player3 == @data.player3 && @newData.player4 == @data.player4 && @newData.state == 'waiting') || (@data.playerCount == 2 && @newData.player2 == @data.player2 && @newData.player3 == @user.address && @newData.player4 == @data.player4 && @newData.state == 'waiting') || (@data.playerCount == 3 && @newData.player2 == @data.player2 && @newData.player3 == @data.player3 && @newData.player4 == @user.address && @newData.state == 'playing'))) || (@user.address == @constants.PROJECT_VAULT_ADDRESS && @data.state == 'playing' && @newData.state == 'resolved' && @newData.creator == @data.creator && @newData.player2 == @data.player2 && @newData.player3 == @data.player3 && @newData.player4 == @data.player4 && @newData.playerCount == @data.playerCount && @newData.gameType == @data.gameType && @newData.buyIn == @data.buyIn && @newData.buyInCurrency == @data.buyInCurrency) || (@data.state == 'waiting' && @data.playerCount == 1 && (@user.address == @data.creator || @user.address == @constants.PROJECT_VAULT_ADDRESS) && @newData.state == 'cancelled' && @newData.creator == @data.creator && @newData.player2 == @data.player2 && @newData.player3 == @data.player3 && @newData.player4 == @data.player4 && @newData.playerCount == @data.playerCount && @newData.gameType == @data.gameType && @newData.createdAt == @data.createdAt && @newData.startedAt == @data.startedAt && @newData.winner == null && @newData.secondPlace == null && @newData.winnerScore == 0 && @newData.secondPlaceScore == 0 && @newData.buyIn == @data.buyIn && @newData.buyInCurrency == @data.buyInCurrency)",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@AccountPlugin.createAccount($gameId) && ((@newData.buyInCurrency == 'MNY' && @AccountPlugin.createAccount(@constants.SPIN_POOL_ID) && @TokenPlugin.transfer(@user.address, $gameId, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @newData.buyIn)) || (@newData.buyInCurrency == 'SOL' && @TokenPlugin.transfer(@user.address, $gameId, @constants.SOL, @newData.buyIn)))",
+        "update": "(@user.address == @constants.PROJECT_VAULT_ADDRESS && @newData.state == 'resolved' && ((@data.buyInCurrency == 'MNY' && @TokenPlugin.transfer($gameId, @newData.winner, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), (@data.buyIn * @data.playerCount * 75) // 100) && @TokenPlugin.transfer($gameId, @newData.secondPlace, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), (@data.buyIn * @data.playerCount * 20) // 100) && @TokenPlugin.transfer($gameId, @constants.SPIN_POOL_ID, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), (@data.buyIn * @data.playerCount * 5) // 100)) || ((@data.buyInCurrency == null || @data.buyInCurrency == 'SOL') && @TokenPlugin.transfer($gameId, @newData.winner, @constants.SOL, (@data.buyIn * @data.playerCount * 75) // 100) && @TokenPlugin.transfer($gameId, @newData.secondPlace, @constants.SOL, (@data.buyIn * @data.playerCount * 20) // 100) && @TokenPlugin.transfer($gameId, @constants.ADMIN_ADDRESS, @constants.SOL, (@data.buyIn * @data.playerCount * 5) // 100)))) || (@newData.state == 'cancelled' && ((@data.buyInCurrency == 'MNY' && @TokenPlugin.transfer($gameId, @data.creator, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @data.buyIn)) || ((@data.buyInCurrency == null || @data.buyInCurrency == 'SOL') && @TokenPlugin.transfer($gameId, @data.creator, @constants.SOL, @data.buyIn)))) || (@user.address != @constants.PROJECT_VAULT_ADDRESS && @newData.state != 'cancelled' && ((@data.buyInCurrency == 'MNY' && @TokenPlugin.transfer(@user.address, $gameId, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @data.buyIn)) || ((@data.buyInCurrency == null || @data.buyInCurrency == 'SOL') && @TokenPlugin.transfer(@user.address, $gameId, @constants.SOL, @data.buyIn))))"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can view games to find waiting games to join or watch ongoing/resolved games. Includes optional gameType field for multi-game architecture.",
+      "create": "Any authenticated non-vault user can create a game. Creator becomes player 1, pays buyIn into a per-game escrow PDA created via @AccountPlugin.createAccount($gameId). Must specify buyInCurrency ('SOL' or 'MNY'). For SOL, buyIn must be one of: 10000000 (0.01 SOL Casual), 100000000 (0.1 SOL Standard), or 500000000 (0.5 SOL High Stakes). For MNY, buyIn must be greater than 0 in MNY base units. Initial fields enforced: state='waiting', playerCount=1, winnerScore=0, secondPlaceScore=0. Optional gameType field can be set on creation and is immutable after creation. Hook ensures SPIN_POOL_ID PDA exists for MNY games and transfers buyIn from creator to escrow in the correct token.",
+      "update": "Three allowed transitions: (a) JOIN — non-vault user (not already in game) joins a waiting game by occupying the next free player slot (player2/3/4), playerCount increments by 1, state flips to 'playing' on the 4th joiner, and buyIn is transferred to the escrow PDA in the game's token (MNY or SOL). gameType, buyIn, and buyInCurrency are preserved unchanged. (b) RESOLVE — only PROJECT_VAULT_ADDRESS can transition state from 'playing' to 'resolved' setting winner/secondPlace/scores; escrow pays winner 75% of pool, second 20%, and 5% platform fee to SPIN_POOL_ID (MNY) or ADMIN_ADDRESS (SOL) in the game's token. gameType, buyIn, and buyInCurrency are preserved unchanged. (c) CANCEL — allowed only when state='waiting' and playerCount == 1 (no joiners). Either the creator (player-initiated) or PROJECT_VAULT_ADDRESS (cron timeout) sets state='cancelled'. All immutable fields (creator, player2, player3, player4, playerCount, gameType, buyIn, buyInCurrency, createdAt, startedAt) are preserved; winner/secondPlace stay null and winnerScore/secondPlaceScore stay 0. Hook refunds buyIn from the escrow PDA back to the creator in the original currency (MNY or SOL).",
+      "delete": "Operation disallowed — game records are immutable for audit/integrity."
+    },
+    "queries": {
+      "getEscrowAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress($gameId)"
+      }
+    }
+  },
+  "gameSubmissions/$gameId/players/$playerAddress": {
+    "description": "Player tap-count submissions for a game. Each player submits once after the 10-second tap phase. Backend reads these to determine winner/second place.",
+    "fields": {
+      "gameId": "String!",
+      "player": "Address!",
+      "tapCount": "Int!",
+      "submittedAt": "Int!"
+    },
+    "onchain": false,
+    "rules": {
+      "read": "true",
+      "create": "@user.address == $playerAddress && @newData.player == @user.address && @newData.gameId == $gameId",
+      "update": "false",
+      "delete": "false"
+    },
+    "operationDetails": {
+      "read": "Anyone can read submissions (publicly verifiable scores).",
+      "create": "Players can only submit for themselves ($playerAddress must equal @user.address). Backend filters to ensure player is part of the referenced game when computing the winner. One-shot submission. Path uses subcollection 'players' between $gameId and $playerAddress.",
+      "update": "Operation disallowed — submissions are immutable to prevent cheating.",
+      "delete": "Operation disallowed — submissions are part of the audit trail."
+    }
+  },
+  "users/$userId": {
+    "description": "User profile records keyed by wallet address. Stores display nickname for UI rendering across the app.",
+    "fields": {
+      "nickname": "String",
+      "address": "Address",
+      "createdAt": "UInt"
+    },
+    "onchain": false,
+    "rules": {
+      "read": "true",
+      "create": "@user.address == $userId",
+      "update": "@user.address == $userId",
+      "delete": "false"
+    },
+    "operationDetails": {
+      "read": "Anyone (authenticated or not) can read user profiles. Used to display nicknames across the app.",
+      "create": "Authenticated users only. Caller's wallet must match $userId path segment, ensuring users can only create their own profile. Frontend should use the wallet address as the document ID and pass it as the address field, plus a nickname and createdAt timestamp (Unix seconds).",
+      "update": "Authenticated users only. Caller's wallet must match $userId, so users can only update their own profile (e.g., change nickname). Cannot modify another user's profile.",
+      "delete": "Operation disallowed. Profiles are permanent once created."
+    }
+  },
+  "flashMatches/$matchId": {
+    "description": "Flash-reaction game match. Up to 4 players each pay a tiered buy-in into a per-match escrow PDA. Backend chooses a flash time, players tap, and the backend resolves the match - 75% to winner, 20% to second place, 5% to fee pool PDA. If no other players have joined (playerCount == 1), the match can be cancelled by either the creator or PROJECT_VAULT_ADDRESS (cron timeout), and the creator's buy-in is refunded from the escrow PDA.",
+    "fields": {
+      "creator": "Address!",
+      "playerCount": "UInt",
+      "state": "String",
+      "flashMomentMs": "UInt",
+      "winner": "Address?",
+      "winnerDeltaMs": "UInt",
+      "ts": "UInt!",
+      "secondPlace": "Address?",
+      "secondPlaceDeltaMs": "UInt",
+      "buyIn": "UInt!",
+      "buyInCurrency": "String!"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "@user.address != @constants.PROJECT_VAULT_ADDRESS && @newData.creator == @user.address && @newData.playerCount == 1 && @newData.state == 'waiting' && @newData.flashMomentMs == 0 && @newData.winnerDeltaMs == 0 && @newData.secondPlaceDeltaMs == 0 && ((@newData.buyInCurrency == 'SOL' && (@newData.buyIn == 10000000 || @newData.buyIn == 100000000 || @newData.buyIn == 500000000)) || (@newData.buyInCurrency == 'MNY' && @newData.buyIn > 0))",
+      "update": "(@user.address == @constants.PROJECT_VAULT_ADDRESS && @data.state == 'waiting' && @newData.state == 'playing' && @newData.creator == @data.creator && @newData.playerCount == @data.playerCount && @newData.winnerDeltaMs == @data.winnerDeltaMs && @newData.secondPlaceDeltaMs == @data.secondPlaceDeltaMs && @newData.buyIn == @data.buyIn && @newData.buyInCurrency == @data.buyInCurrency) || (@user.address == @constants.PROJECT_VAULT_ADDRESS && @data.state == 'playing' && @newData.state == 'resolved' && @newData.creator == @data.creator && @newData.playerCount == @data.playerCount && @newData.flashMomentMs == @data.flashMomentMs && @newData.winner != null && @newData.buyIn == @data.buyIn && @newData.buyInCurrency == @data.buyInCurrency) || (@data.state == 'waiting' && @data.playerCount == 1 && (@user.address == @data.creator || @user.address == @constants.PROJECT_VAULT_ADDRESS) && @newData.state == 'cancelled' && @newData.creator == @data.creator && @newData.playerCount == @data.playerCount && @newData.flashMomentMs == @data.flashMomentMs && @newData.winnerDeltaMs == @data.winnerDeltaMs && @newData.secondPlaceDeltaMs == @data.secondPlaceDeltaMs && @newData.ts == @data.ts && @newData.buyIn == @data.buyIn && @newData.buyInCurrency == @data.buyInCurrency)",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@AccountPlugin.createAccount($matchId) && ((@newData.buyInCurrency == 'MNY' && @AccountPlugin.createAccount(@constants.SPIN_POOL_ID) && @TokenPlugin.transfer(@user.address, $matchId, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @newData.buyIn)) || (@newData.buyInCurrency == 'SOL' && @TokenPlugin.transfer(@user.address, $matchId, @constants.SOL, @newData.buyIn) && @AccountPlugin.createAccount(@constants.FEE_POOL_ID)))",
+        "update": "(@newData.state == 'resolved' && ((@data.buyInCurrency == 'MNY' && @TokenPlugin.transfer($matchId, @newData.winner, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), (@data.buyIn * @data.playerCount * 75) // 100) && @TokenPlugin.transfer($matchId, @newData.secondPlace, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), (@data.buyIn * @data.playerCount * 20) // 100) && @TokenPlugin.transfer($matchId, @constants.SPIN_POOL_ID, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), (@data.buyIn * @data.playerCount * 5) // 100)) || ((@data.buyInCurrency == null || @data.buyInCurrency == 'SOL') && @TokenPlugin.transfer($matchId, @newData.winner, @constants.SOL, (@data.buyIn * @data.playerCount * 75) // 100) && @TokenPlugin.transfer($matchId, @newData.secondPlace, @constants.SOL, (@data.buyIn * @data.playerCount * 20) // 100) && @TokenPlugin.transfer($matchId, @constants.FEE_POOL_ID, @constants.SOL, (@data.buyIn * @data.playerCount * 5) // 100)))) || (@newData.state == 'playing') || (@newData.state == 'cancelled' && ((@data.buyInCurrency == 'MNY' && @TokenPlugin.transfer($matchId, @data.creator, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @data.buyIn)) || ((@data.buyInCurrency == null || @data.buyInCurrency == 'SOL') && @TokenPlugin.transfer($matchId, @data.creator, @constants.SOL, @data.buyIn))))"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read matches (lobby browsing, ongoing/resolved matches).",
+      "create": "Any authenticated non-vault user creates a match. Creator becomes player 1, transfers buyIn to a per-match escrow PDA derived from $matchId. Must specify buyInCurrency ('SOL' or 'MNY'). For SOL, buyIn must be one of: 10000000 (0.01 SOL Casual), 100000000 (0.1 SOL Standard), or 500000000 (0.5 SOL High Stakes). For MNY, buyIn must be greater than 0 in MNY base units. State must initialize to 'waiting'. Hook ensures the appropriate pool PDA exists (SPIN_POOL_ID for MNY, FEE_POOL_ID for SOL) and transfers buyIn from creator to escrow in the correct token.",
+      "update": "Three transitions: (a) START: 'waiting' -> 'playing', backend-only (PROJECT_VAULT_ADDRESS). Backend has chosen flashMomentMs and writes it. playerCount, buyIn, and buyInCurrency are preserved. (b) RESOLVE: 'playing' -> 'resolved', backend-only. Backend writes winner, secondPlace, winnerDeltaMs, secondPlaceDeltaMs. Hook pays out winner 75% of pool, second place 20%, and 5% fee to SPIN_POOL_ID (MNY) or FEE_POOL_ID (SOL) in the match's token. Atomic. (c) CANCEL: 'waiting' -> 'cancelled', allowed only when playerCount == 1 (no other players joined). Either the creator (player-initiated) or PROJECT_VAULT_ADDRESS (cron timeout) can cancel. Hook refunds buyIn from the escrow PDA back to the creator in the original currency (MNY or SOL). Per-player refunds for cancellations with multiple joiners are out of scope.",
+      "delete": "Operation disallowed - matches are immutable for audit."
+    },
+    "queries": {
+      "getMatchEscrowAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress($matchId)"
+      },
+      "getFeePoolAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress(@constants.FEE_POOL_ID)"
+      }
+    }
+  },
+  "flashMatchJoins/$matchId/players/$playerAddress": {
+    "description": "Per-player join records for a flash match. Each row represents a player who paid the buy-in into the match escrow PDA. Used by the backend to enumerate participants and validate winner address. The match creator's record is implied by the parent flashMatches.creator field; subsequent joiners create rows here.",
+    "fields": {
+      "player": "Address!",
+      "ts": "UInt!"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "@user.address == $playerAddress && @newData.player == @user.address && get(/flashMatches/$matchId) != null && get(/flashMatches/$matchId).state == 'waiting' && get(/flashMatches/$matchId).playerCount < @constants.MAX_PLAYERS_PER_MATCH && get(/flashMatches/$matchId).creator != @user.address",
+      "update": "false",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "((get(/flashMatches/$matchId).buyInCurrency == 'MNY' && @TokenPlugin.transfer(@user.address, $matchId, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), get(/flashMatches/$matchId).buyIn)) || ((get(/flashMatches/$matchId).buyInCurrency == null || get(/flashMatches/$matchId).buyInCurrency == 'SOL') && @TokenPlugin.transfer(@user.address, $matchId, @constants.SOL, get(/flashMatches/$matchId).buyIn))) && @DocumentPlugin.updateField(/flashMatches/$matchId, 'playerCount', get(/flashMatches/$matchId).playerCount + 1)"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read participants (publicly verifiable).",
+      "create": "Authenticated player joins a waiting match. $playerAddress must equal @user.address. Match must exist, be in 'waiting' state, have playerCount < MAX_PLAYERS_PER_MATCH (4), and the joiner must not already be the creator. Hook transfers buyIn (read from parent match) from joiner to match escrow PDA in the match's token (MNY or SOL) and increments flashMatches.playerCount. Path uniqueness on $playerAddress prevents the same wallet joining twice.",
+      "update": "Operation disallowed - joins are immutable.",
+      "delete": "Operation disallowed in v1 - cancellation refunds will be handled in a future iteration."
+    }
+  },
+  "flashMatchTaps/$matchId/players/$playerAddress": {
+    "description": "Off-chain tap submissions for a flash match. Each player records the time (ms since match start) at which they tapped. Backend reads these to compute the player whose tap is closest to flashMomentMs and resolves the match.",
+    "fields": {
+      "player": "Address!",
+      "tapTimeMs": "UInt!",
+      "submittedAt": "UInt!"
+    },
+    "onchain": false,
+    "rules": {
+      "read": "true",
+      "create": "@user.address == $playerAddress && @newData.player == @user.address",
+      "update": "false",
+      "delete": "false"
+    },
+    "operationDetails": {
+      "read": "Anyone can read tap submissions for transparency.",
+      "create": "Authenticated player submits exactly one tap for themselves. $playerAddress must equal @user.address. Backend filters to ensure the player is part of the flashMatches/$matchId match before counting their tap.",
+      "update": "Operation disallowed - submissions are immutable to prevent cheating.",
+      "delete": "Operation disallowed - tap records are part of the audit trail."
+    }
+  },
+  "feePoolDistributions/$distributionId": {
+    "description": "Hourly fee-pool distribution records. Backend (PROJECT_VAULT_ADDRESS) creates one record per active staker per hour, which atomically transfers their pro-rata share of SOL from the FEE_POOL_ID PDA to the recipient. Distribution is based on the recipient's staked MNY (mnyStakes.amountStaked) at snapshot time. Pure MNY holders do NOT earn — only stakers earn. Document ID convention: '{epochHour}_{recipient}' so it is unique per recipient per hour.",
+    "fields": {
+      "epochHour": "UInt!",
+      "recipient": "Address!",
+      "amountLamports": "UInt!",
+      "totalPoolLamports": "UInt!",
+      "ts": "UInt!",
+      "stakedAmountBaseUnits": "UInt!",
+      "totalStakedAmountBaseUnits": "UInt!"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "@user.address == @constants.PROJECT_VAULT_ADDRESS && @newData.amountLamports > 0",
+      "update": "false",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@TokenPlugin.transfer(@constants.FEE_POOL_ID, @newData.recipient, @constants.SOL, @newData.amountLamports)"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read distribution records. Public stats (total SOL distributed) are computed by summing amountLamports across this collection. Per-recipient history can be filtered client-side.",
+      "create": "Backend-only (PROJECT_VAULT_ADDRESS). Triggered by the Heartbeat hourly task. The backend snapshots all mnyStakes documents with amountStaked > 0, sums them into totalStakedAmountBaseUnits, computes each staker's share = totalPoolLamports * stakedAmountBaseUnits / totalStakedAmountBaseUnits, and writes one record per (epochHour, staker). Hook transfers SOL from FEE_POOL_ID PDA to the recipient atomically. Backend ensures the sum of distributions for an epochHour does not exceed the available pool balance.",
+      "update": "Operation disallowed - distribution records are immutable.",
+      "delete": "Operation disallowed - immutable audit trail."
+    },
+    "queries": {
+      "getFeePoolAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress(@constants.FEE_POOL_ID)"
+      }
+    }
+  },
+  "tokenUnlocks/$unlockId": {
+    "description": "Onchain token unlock records — each document represents one scheduled unlock trigger releasing 20% of total MNY supply from treasury to admin wallet. Only admin or backend can trigger.",
+    "fields": {
+      "triggeredBy": "Address!",
+      "amount": "UInt!",
+      "tranche": "UInt!",
+      "ts": "UInt!",
+      "milestoneId": "String"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "(@user.address == @constants.ADMIN_ADDRESS || @user.address == @constants.PROJECT_VAULT_ADDRESS) && (@newData.milestoneId == 'second-sale' || @newData.milestoneId == 'special-prizes-part-2' || @newData.milestoneId == 'final-sale')",
+      "update": "false",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@TokenPlugin.transfer(@constants.TPR_TREASURY_ID, @constants.ADMIN_ADDRESS, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @data.amount) && ((get(/tokenUnlockStats/main) == null && @DocumentPlugin.updateField(/tokenUnlockStats/main, 'totalUnlocked', @data.amount)) || @DocumentPlugin.updateField(/tokenUnlockStats/main, 'totalUnlocked', get(/tokenUnlockStats/main).totalUnlocked + @data.amount))"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read unlock records. Public transparency for all token releases.",
+      "create": "Only ADMIN_ADDRESS or PROJECT_VAULT_ADDRESS can trigger. Transfers 20% of total supply (TPR_INITIAL_SUPPLY / 5 = 200,000,000,000 base units = 200,000 MNY) from treasury PDA to admin wallet via @TokenPlugin.transfer. Idempotently initializes or increments tokenUnlockStats/main.totalUnlocked. Frontend must provide: triggeredBy (caller address), amount (TPR_INITIAL_SUPPLY // 5), tranche (sequential counter), ts (current Unix timestamp), milestoneId (one of 'second-sale', 'special-prizes-part-2', 'final-sale'). milestoneId is enforced via create rule.",
+      "update": "Operation disallowed. Unlock records are immutable once created.",
+      "delete": "Operation disallowed. Immutable audit trail for all token releases."
+    },
+    "queries": {
+      "getTreasuryAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress(@constants.TPR_TREASURY_ID)"
+      },
+      "getTokenMint": {
+        "returnType": "String",
+        "query": "@TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL)"
+      }
+    }
+  },
+  "tokenUnlockStats/$id": {
+    "description": "Singleton tracker for cumulative PPP token unlocks. Holds totalUnlocked so anyone can query how much has been released from treasury. Created lazily by the first unlock via @DocumentPlugin.updateField. The single document ID is 'main'.",
+    "fields": {
+      "totalUnlocked": "UInt"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "operationDetails": {
+      "read": "Anyone can read the running total to see cumulative unlocked supply.",
+      "create": "Operation disallowed for users — written exclusively by hooks from tokenUnlocks (auto-initialized by @DocumentPlugin.updateField).",
+      "update": "Operation disallowed for users — updated only by token unlock hooks via @DocumentPlugin.updateField.",
+      "delete": "Operation disallowed — immutable cumulative ledger."
+    }
+  },
+  "tprToken/$tokenId": {
+    "description": "MNY token. Fixed supply 1,000,000 (with 6 decimals = 1e12 base units) minted on creation to a treasury PDA. Admin-only creation - one-time setup. Treasury PDA serves as the source for the primary sale and future distributions.",
+    "fields": {
+      "creator": "Address!",
+      "name": "String!",
+      "symbol": "String!",
+      "uri": "String?",
+      "supply": "UInt!",
+      "ts": "UInt!"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "@user.address == @constants.ADMIN_ADDRESS && @newData.creator == @user.address && $tokenId == @constants.TPR_TOKEN_ID && @newData.supply == @constants.TPR_INITIAL_SUPPLY",
+      "update": "false",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@TokenPlugin.createToken($tokenId, @newData.name, @newData.symbol, @newData.uri, 6) && @AccountPlugin.createAccount(@constants.TPR_TREASURY_ID) && @TokenPlugin.mint($tokenId, @newData.name, @newData.symbol, @AccountPlugin.getAccountAddress(@constants.TPR_TREASURY_ID), @newData.supply)"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read token metadata.",
+      "create": "Admin-only one-time creation. $tokenId must equal @constants.TPR_TOKEN_ID. Creator must equal @user.address (the admin). Supply must equal TPR_INITIAL_SUPPLY (1,000,000 * 10^6 base units). Hook creates SPL mint with 6 decimals, derives a treasury PDA via @AccountPlugin.createAccount(TPR_TREASURY_ID), and mints the entire supply to that PDA. Tokens are minted to a PDA (not directly to PROJECT_VAULT_ADDRESS) so the Poof program can sign for primary-sale and listing transfers; SOL proceeds from the primary sale flow to ADMIN_ADDRESS as intended.",
+      "update": "Operation disallowed - token metadata is immutable once created.",
+      "delete": "Operation disallowed - token records are permanent."
+    },
+    "queries": {
+      "getTokenMintAddress": {
+        "returnType": "String",
+        "query": "@TokenPlugin.getTokenMintAddress($tokenId, @data.name, @data.symbol)"
+      },
+      "getTreasuryAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress(@constants.TPR_TREASURY_ID)"
+      }
+    }
+  },
+  "tprPrimarySaleStats/$id": {
+    "description": "Singleton tracker for the TPR primary sale tranche. Holds cumulative totalSoldBaseUnits so the cap of 100,000 TPR (= 100,000 * 10^6 base units) can be enforced atomically. Created lazily by the first primary-sale purchase via @DocumentPlugin.updateField. The single document ID is 'main' (enforced via path constant in queries/UI).",
+    "fields": {
+      "totalSoldBaseUnits": "UInt"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "operationDetails": {
+      "read": "Anyone can read the running total to compute remaining supply in the primary tranche.",
+      "create": "Operation disallowed for users - this collection is written exclusively by hooks from tprPrimarySales (auto-initialized by @DocumentPlugin.updateField, which creates the doc if it doesn't exist).",
+      "update": "Operation disallowed for users - updated only by primary-sale hooks via @DocumentPlugin.updateField.",
+      "delete": "Operation disallowed - immutable cumulative ledger."
+    }
+  },
+  "tprPrimarySales/$saleId": {
+    "description": "Primary-sale purchase records for the MNY token. Buyer transfers SOL to ADMIN (dev earnings) and receives MNY from the treasury PDA. Two caps enforced: (1) global tranche cap via tprPrimarySaleStats/main, (2) per-wallet cap of 5,000 MNY via tprBuyerStats/$buyerAddress. Sale price is configurable per-tranche via tprSalePrice/main with fallback to TPR_PRIMARY_SALE_PRICE_LAMPORTS constant. isPassthrough=true so no permanent onchain row is stored - the off-chain copy still records the sale.",
+    "fields": {
+      "buyer": "Address!",
+      "solAmountLamports": "UInt!",
+      "ts": "UInt!",
+      "tprAmountBaseUnits": "UInt!"
+    },
+    "onchain": true,
+    "isPassthrough": true,
+    "rules": {
+      "read": "true",
+      "create": "@newData.buyer == @user.address && @newData.tprAmountBaseUnits > 0 && ((get(/tprSalePrice/main) == null && @newData.solAmountLamports == (@newData.tprAmountBaseUnits * @constants.TPR_PRIMARY_SALE_PRICE_LAMPORTS) // 1000000) || (get(/tprSalePrice/main) != null && @newData.solAmountLamports == (@newData.tprAmountBaseUnits * get(/tprSalePrice/main).priceLamportsPerWholeToken) // 1000000)) && ((get(/tprPrimarySaleStats/main) == null && @newData.tprAmountBaseUnits <= @constants.TPR_PRIMARY_SALE_CAP_BASE_UNITS) || (get(/tprPrimarySaleStats/main) != null && get(/tprPrimarySaleStats/main).totalSoldBaseUnits + @newData.tprAmountBaseUnits <= @constants.TPR_PRIMARY_SALE_CAP_BASE_UNITS)) && ((get(/tprBuyerStats/@user.address) == null && @newData.tprAmountBaseUnits <= @constants.TPR_PER_WALLET_CAP_BASE_UNITS) || (get(/tprBuyerStats/@user.address) != null && get(/tprBuyerStats/@user.address).totalPurchasedBaseUnits + @newData.tprAmountBaseUnits <= @constants.TPR_PER_WALLET_CAP_BASE_UNITS))"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@TokenPlugin.transfer(@user.address, @constants.ADMIN_ADDRESS, @constants.SOL, @newData.solAmountLamports) && @TokenPlugin.transfer(@constants.TPR_TREASURY_ID, @user.address, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @newData.tprAmountBaseUnits) && ((get(/tprPrimarySaleStats/main) == null && @DocumentPlugin.updateField(/tprPrimarySaleStats/main, 'totalSoldBaseUnits', @newData.tprAmountBaseUnits)) || @DocumentPlugin.updateField(/tprPrimarySaleStats/main, 'totalSoldBaseUnits', get(/tprPrimarySaleStats/main).totalSoldBaseUnits + @newData.tprAmountBaseUnits)) && ((get(/tprBuyerStats/@user.address) == null && @DocumentPlugin.updateField(/tprBuyerStats/@user.address, 'totalPurchasedBaseUnits', @newData.tprAmountBaseUnits)) || @DocumentPlugin.updateField(/tprBuyerStats/@user.address, 'totalPurchasedBaseUnits', get(/tprBuyerStats/@user.address).totalPurchasedBaseUnits + @newData.tprAmountBaseUnits))"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read primary-sale receipts (publicly verifiable).",
+      "create": "Authenticated buyer purchases MNY from the dev tranche. Buyer must equal @user.address. Price: if tprSalePrice/main exists, solAmountLamports must equal tprAmountBaseUnits * tprSalePrice/main.priceLamportsPerWholeToken / 1_000_000; otherwise falls back to tprAmountBaseUnits * TPR_PRIMARY_SALE_PRICE_LAMPORTS / 1_000_000. Two caps enforced atomically: (1) global tranche cap against tprPrimarySaleStats/main.totalSoldBaseUnits <= TPR_PRIMARY_SALE_CAP_BASE_UNITS, and (2) per-wallet cap against tprBuyerStats/<buyerAddress>.totalPurchasedBaseUnits <= TPR_PER_WALLET_CAP_BASE_UNITS (5,000 MNY = 5_000_000_000 base units). Hook: (1) transfers SOL from buyer to ADMIN, (2) transfers MNY from treasury PDA to buyer, (3) idempotently initializes or increments tprPrimarySaleStats/main.totalSoldBaseUnits, (4) idempotently initializes or increments tprBuyerStats/<@user.address>.totalPurchasedBaseUnits. isPassthrough=true so no permanent onchain row is stored.",
+      "update": "Operation disallowed.",
+      "delete": "Operation disallowed."
+    }
+  },
+  "tprListings/$listingId": {
+    "description": "Secondary-market listings: MNY holders escrow tokens into a per-listing PDA and set a SOL price. Anyone can buy at the listed price. Seller can cancel and reclaim tokens.",
+    "fields": {
+      "seller": "Address!",
+      "pricePerWholeTokenLamports": "UInt!",
+      "active": "Bool",
+      "ts": "UInt!",
+      "tprAmountBaseUnits": "UInt!"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "@newData.seller == @user.address && @newData.tprAmountBaseUnits > 0 && @newData.pricePerWholeTokenLamports > 0 && @newData.active == true",
+      "update": "@user.address == @data.seller && @data.active == true && @newData.active == false && @newData.seller == @data.seller && @newData.tprAmountBaseUnits == @data.tprAmountBaseUnits && @newData.pricePerWholeTokenLamports == @data.pricePerWholeTokenLamports",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@AccountPlugin.createAccount($listingId) && @TokenPlugin.transfer(@user.address, $listingId, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @newData.tprAmountBaseUnits)",
+        "update": "@TokenPlugin.transfer($listingId, @data.seller, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @data.tprAmountBaseUnits)"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can browse open and closed listings.",
+      "create": "Authenticated seller creates a listing. Seller must equal @user.address. Hook creates a per-listing PDA and transfers the listed MNY amount from the seller into that PDA. The listing starts active=true.",
+      "update": "Only the seller can update, and only to cancel (active true -> false). All other fields must remain unchanged. Hook returns the escrowed MNY tokens from the listing PDA back to the seller. Buying happens via the tprPurchases collection (which sets active=false through that flow's hook).",
+      "delete": "Operation disallowed - listings remain in history once created."
+    },
+    "queries": {
+      "getListingEscrowAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress($listingId)"
+      }
+    }
+  },
+  "tprPurchases/$purchaseId": {
+    "description": "Buy records against an active tprListings entry. Atomically transfers SOL from buyer to seller and MNY from listing PDA to buyer, and marks the listing inactive.",
+    "fields": {
+      "buyer": "Address!",
+      "listingId": "String!",
+      "totalSolLamports": "UInt!",
+      "seller": "Address!",
+      "ts": "UInt!",
+      "tprAmountBaseUnits": "UInt!"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "@newData.buyer == @user.address && get(/tprListings/@newData.listingId) != null && get(/tprListings/@newData.listingId).active == true && @newData.seller == get(/tprListings/@newData.listingId).seller && @newData.tprAmountBaseUnits == get(/tprListings/@newData.listingId).tprAmountBaseUnits && @newData.totalSolLamports == (get(/tprListings/@newData.listingId).tprAmountBaseUnits * get(/tprListings/@newData.listingId).pricePerWholeTokenLamports) // 1000000",
+      "update": "false",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@TokenPlugin.transfer(@user.address, @newData.seller, @constants.SOL, @newData.totalSolLamports) && @TokenPlugin.transfer(@newData.listingId, @user.address, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @newData.tprAmountBaseUnits) && @DocumentPlugin.updateField(/tprListings/@newData.listingId, 'active', false)"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read purchase records (publicly verifiable).",
+      "create": "Authenticated buyer purchases an entire active listing. Frontend must pass listingId as the FULL document ID of the listing being bought. Buyer must equal @user.address. Server validates listing exists, is active, and snapshot fields (seller, amount, totalSol) match the listing. Hook: (1) transfers SOL from buyer to seller, (2) transfers MNY from listing PDA to buyer, (3) marks tprListings/$listingId.active = false. Atomic - any failure rolls back. NOTE: full-listing buys only; partial fills not supported.",
+      "update": "Operation disallowed - purchase records are immutable receipts.",
+      "delete": "Operation disallowed."
+    }
+  },
+  "coinFlipMatches/$matchId": {
+    "description": "1v1 coin flip match. Player 1 creates with a chosen buy-in tier (0.01, 0.05, or 0.1 SOL) and pays into a per-match escrow PDA. Player 2 joins by matching the buy-in; joining triggers VRF randomness. Winner takes 99% of the pot, 1% goes to the FEE_POOL_ID PDA. If no opponent joins, the match can be cancelled (by creator or by backend timeout cron) and the creator is refunded. Status transitions: waiting -> resolved, or waiting -> cancelled.",
+    "fields": {
+      "creator": "Address!",
+      "opponent": "Address?",
+      "tier": "UInt!",
+      "buyIn": "UInt!",
+      "state": "String",
+      "winner": "Address?",
+      "ts": "UInt!",
+      "buyInCurrency": "String!"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "@user.address != @constants.PROJECT_VAULT_ADDRESS && @newData.creator == @user.address && @newData.opponent == null && @newData.state == 'waiting' && @newData.winner == null && ((@newData.buyInCurrency == \"SOL\" && ((@newData.tier == 1 && @newData.buyIn == @constants.COINFLIP_TIER1_LAMPORTS) || (@newData.tier == 2 && @newData.buyIn == @constants.COINFLIP_TIER2_LAMPORTS) || (@newData.tier == 3 && @newData.buyIn == @constants.COINFLIP_TIER3_LAMPORTS))) || (@newData.buyInCurrency == \"MNY\" && @newData.buyIn > 0))",
+      "update": "(@data.state == 'waiting' && @user.address != @constants.PROJECT_VAULT_ADDRESS && @user.address != @data.creator && @newData.opponent == @user.address && @newData.creator == @data.creator && @newData.tier == @data.tier && @newData.buyIn == @data.buyIn && @newData.state == 'waiting' && @newData.winner == null && @newData.ts == @data.ts) || (@user.address == @constants.PROJECT_VAULT_ADDRESS && @data.state == 'waiting' && @data.opponent != null && @newData.state == 'resolved' && @newData.creator == @data.creator && @newData.opponent == @data.opponent && @newData.tier == @data.tier && @newData.buyIn == @data.buyIn && @newData.ts == @data.ts && (@newData.winner == @data.creator || @newData.winner == @data.opponent)) || (@data.state == 'waiting' && @data.opponent == null && (@user.address == @data.creator || @user.address == @constants.PROJECT_VAULT_ADDRESS) && @newData.state == 'cancelled' && @newData.creator == @data.creator && @newData.tier == @data.tier && @newData.buyIn == @data.buyIn && @newData.ts == @data.ts && @newData.opponent == null && @newData.winner == null)",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@AccountPlugin.createAccount($matchId) && ((@newData.buyInCurrency == \"MNY\" && @AccountPlugin.createAccount(@constants.SPIN_POOL_ID) && @TokenPlugin.transfer(@user.address, $matchId, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @newData.buyIn)) || (@newData.buyInCurrency == \"SOL\" && @AccountPlugin.createAccount(@constants.FEE_POOL_ID) && @TokenPlugin.transfer(@user.address, $matchId, @constants.SOL, @newData.buyIn)))",
+        "update": "(@newData.state == 'cancelled' && ((@data.buyInCurrency == \"MNY\" && @TokenPlugin.transfer($matchId, @data.creator, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @data.buyIn)) || ((@data.buyInCurrency == null || @data.buyInCurrency == \"SOL\") && @TokenPlugin.transfer($matchId, @data.creator, @constants.SOL, @data.buyIn)))) || (@user.address != @constants.PROJECT_VAULT_ADDRESS && @newData.state == 'waiting' && ((@data.buyInCurrency == \"MNY\" && @TokenPlugin.transfer(@user.address, $matchId, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @data.buyIn)) || ((@data.buyInCurrency == null || @data.buyInCurrency == \"SOL\") && @TokenPlugin.transfer(@user.address, $matchId, @constants.SOL, @data.buyIn))) && @OraclePlugin.requestRandomness($matchId, /coinFlipMatchReveals/$matchId)) || (@user.address == @constants.PROJECT_VAULT_ADDRESS && @newData.state == 'resolved' && ((@data.buyInCurrency == \"MNY\" && @TokenPlugin.transfer($matchId, @newData.winner, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), (@data.buyIn * 2 * 99) // 100) && @TokenPlugin.transfer($matchId, @constants.SPIN_POOL_ID, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), (@data.buyIn * 2 * 1) // 100)) || ((@data.buyInCurrency == null || @data.buyInCurrency == \"SOL\") && @TokenPlugin.transfer($matchId, @newData.winner, @constants.SOL, (@data.buyIn * 2 * 99) // 100) && @TokenPlugin.transfer($matchId, @constants.FEE_POOL_ID, @constants.SOL, (@data.buyIn * 2 * 1) // 100))))"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read matches. Use to list waiting matches (state='waiting') for the lobby, resolved matches (state='resolved') for history, and cancelled matches (state='cancelled') for cancellation history.",
+      "create": "Any authenticated non-vault user creates a 1v1 match. Creator becomes player 1. Must specify buyInCurrency ('SOL' or 'MNY'). For SOL, must specify tier (1, 2, or 3) and matching buyIn value from constants (COINFLIP_TIER1_LAMPORTS=0.01 SOL, COINFLIP_TIER2_LAMPORTS=0.05 SOL, COINFLIP_TIER3_LAMPORTS=0.1 SOL). For MNY, buyIn must be greater than 0 in MNY base units. State must initialize to 'waiting' with opponent=null and winner=null. Hook creates per-match escrow PDA, ensures the appropriate pool PDA exists (SPIN_POOL_ID for MNY, FEE_POOL_ID for SOL), and transfers buyIn from creator to escrow.",
+      "update": "Three transitions: (a) JOIN — non-vault user (not the creator) joins by setting opponent=@user.address while state stays 'waiting'. Hook transfers matching buyIn from opponent to escrow and calls @OraclePlugin.requestRandomness. Currency-aware: SOL or MNY transfer based on match's buyInCurrency. (b) RESOLVE — backend (PROJECT_VAULT_ADDRESS) sets state='resolved' once opponent is present and winner is set (must be creator or opponent). Hook pays 99% of pot to winner and 1% fee to SPIN_POOL_ID (MNY) or FEE_POOL_ID (SOL). (c) CANCEL — either the creator (player-initiated) or PROJECT_VAULT_ADDRESS (cron timeout) sets state='cancelled' while opponent is still null. Hook refunds the full buyIn from escrow back to the creator in the original currency. ts/tier/buyIn/creator/buyInCurrency are preserved; opponent and winner remain null.",
+      "delete": "Operation disallowed — match records are immutable for audit/integrity."
+    },
+    "queries": {
+      "getMatchEscrowAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress($matchId)"
+      },
+      "getFeePoolAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress(@constants.FEE_POOL_ID)"
+      },
+      "getRandomOutcome": {
+        "returnType": "UInt",
+        "query": "@OraclePlugin.getRandomNumber($matchId, 0, 2)"
+      },
+      "getVRFAddress": {
+        "returnType": "Address",
+        "query": "@OraclePlugin.getVRFAddress($matchId)"
+      }
+    }
+  },
+  "coinFlipMatchReveals/$matchId": {
+    "description": "VRF callback for coin flip match - resolves winner based on random outcome. Winner address is computed INLINE from VRF randomness in every payout/update expression (NOT read back via getAfter). Pays 99% of pot to winner and 1% fee to SPIN_POOL_ID (MNY) or FEE_POOL_ID (SOL) based on parent match's buyInCurrency. Updates parent coinFlipMatches doc with winner and state='resolved'. Idempotent via early-return when state is already 'resolved'.",
+    "fields": {},
+    "onchain": true,
+    "isRevealPath": true,
+    "rules": {
+      "read": "true",
+      "create": "get(/coinFlipMatches/$matchId) != null && get(/coinFlipMatches/$matchId).state == 'waiting' && get(/coinFlipMatches/$matchId).opponent != null",
+      "update": "false",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "(get(/coinFlipMatches/$matchId).state == 'resolved') || (get(/coinFlipMatches/$matchId).state == 'waiting' && get(/coinFlipMatches/$matchId).opponent != null && @DocumentPlugin.updateField(/coinFlipMatches/$matchId, 'winner', ((@OraclePlugin.getRandomNumber($matchId, 0, 2) == 0) && get(/coinFlipMatches/$matchId).creator) || get(/coinFlipMatches/$matchId).opponent) && @DocumentPlugin.updateField(/coinFlipMatches/$matchId, 'state', 'resolved') && ((get(/coinFlipMatches/$matchId).buyInCurrency == \"MNY\" && @TokenPlugin.transfer($matchId, getAfter(/coinFlipMatches/$matchId).winner, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), (get(/coinFlipMatches/$matchId).buyIn * 2 * 99) // 100) && @TokenPlugin.transfer($matchId, @constants.SPIN_POOL_ID, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), (get(/coinFlipMatches/$matchId).buyIn * 2 * 1) // 100)) || ((get(/coinFlipMatches/$matchId).buyInCurrency == null || get(/coinFlipMatches/$matchId).buyInCurrency == \"SOL\") && @TokenPlugin.transfer($matchId, getAfter(/coinFlipMatches/$matchId).winner, @constants.SOL, (get(/coinFlipMatches/$matchId).buyIn * 2 * 99) // 100) && @TokenPlugin.transfer($matchId, @constants.FEE_POOL_ID, @constants.SOL, (get(/coinFlipMatches/$matchId).buyIn * 2 * 1) // 100)))) || true"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read reveal records (fieldless audit markers).",
+      "create": "Oracle VRF callback triggered automatically by Orao after @OraclePlugin.requestRandomness. EXECUTION ORDER (critical for reliability): (1) idempotency early-return if parent state is already 'resolved'; (2) verify parent is 'waiting' with an opponent; (3) compute winner inline from @OraclePlugin.getRandomNumber($matchId,0,2) where 0->creator and 1->opponent, and write it to the parent match's 'winner' field via @DocumentPlugin.updateField (bypasses collection rules); (4) write state='resolved' via @DocumentPlugin.updateField; (5) THEN pay 99% of pot to the recorded winner (read back via getAfter so payout matches the stored winner exactly) and 1% fee to SPIN_POOL_ID (MNY) or FEE_POOL_ID (SOL) based on parent buyInCurrency. The whole expression is wrapped in '|| true' so the reveal document and the winner/state writes are never rolled back by a transient payout edge case, and so duplicate oracle callbacks are safe. winner/state are written BEFORE payouts so the match always reaches 'resolved' (frontend keys 'Games Played' and animation-stop off state=='resolved').",
+      "update": "Operation disallowed — reveals are immutable.",
+      "delete": "Operation disallowed — reveals are part of the audit trail."
+    }
+  },
+  "tprBuyerStats/$buyerAddress": {
+    "description": "Singleton tracker per buyer for the TPR primary sale. Holds cumulative totalPurchasedBaseUnits to enforce the 5,000 MNY (= 5,000 * 10^6 base units) per-wallet cap atomically. Created lazily by the first primary-sale purchase via @DocumentPlugin.updateField. Document ID is the buyer wallet address.",
+    "fields": {
+      "totalPurchasedBaseUnits": "UInt"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "false",
+      "update": "false",
+      "delete": "false"
+    },
+    "operationDetails": {
+      "read": "Anyone can read a buyer's cumulative primary-sale purchase total. Used to compute remaining per-wallet allowance.",
+      "create": "Operation disallowed for users. This collection is written exclusively by hooks from tprPrimarySales (auto-initialized by @DocumentPlugin.updateField on first purchase, which creates the doc if it doesn't exist).",
+      "update": "Operation disallowed for users. Updated only by primary-sale hooks via @DocumentPlugin.updateField, which increments totalPurchasedBaseUnits.",
+      "delete": "Operation disallowed. Immutable cumulative per-buyer ledger."
+    }
+  },
+  "tprSalePrice/$id": {
+    "description": "Onchain singleton (ID 'main') configurable by admin holding the current MNY primary-sale price in lamports of SOL per 1 whole MNY token (= 10^6 base units). If this document does not exist, the primary sale falls back to the constant TPR_PRIMARY_SALE_PRICE_LAMPORTS. Admin can update it at any time (e.g., at tranche unlock time) to change the price for subsequent purchases. No onchain hooks - metadata only.",
+    "fields": {
+      "priceLamportsPerWholeToken": "UInt!"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "$id == 'main' && @user.address == @constants.ADMIN_ADDRESS && @newData.priceLamportsPerWholeToken > 0",
+      "update": "$id == 'main' && @user.address == @constants.ADMIN_ADDRESS && @newData.priceLamportsPerWholeToken > 0",
+      "delete": "false"
+    },
+    "operationDetails": {
+      "read": "Anyone can read the current MNY primary-sale price. Public so frontends can compute SOL cost for a purchase.",
+      "create": "Only ADMIN_ADDRESS can create the singleton document with ID 'main'. priceLamportsPerWholeToken must be > 0. Sets the active per-whole-token price for tprPrimarySales going forward. Field is readonly (UInt!) after create - use update to change the price.",
+      "update": "Only ADMIN_ADDRESS can update. priceLamportsPerWholeToken must be > 0. Allows admin to change the primary-sale price (e.g., at each new tranche unlock).",
+      "delete": "Operation disallowed. Once initialized, price doc cannot be removed - only updated."
+    }
+  },
+  "rpsMatches/$matchId": {
+    "description": "Onchain 1v1 Rock-Paper-Scissors match. Creator picks a buy-in tier (SOL) or any positive amount (MNY) and pays into a per-match escrow PDA. Opponent joins by matching the buy-in. Best-of-3: first player to 2 round wins takes 99% of the pot, 1% platform fee goes to the FEE_POOL_ID PDA (SOL) or SPIN_POOL_ID PDA (MNY) — consistent with the coinflip game. Round commit/reveal coordination is offchain in the rounds subcollection. Status transitions: waiting -> active -> complete | abandoned. If a match goes inactive while 'active' for more than RPS_ABANDON_TIMEOUT_SECONDS, any authenticated user can transition it to 'abandoned' which refunds both players their original buyInLamports from the escrow. Frontend-signed (no backend vault).",
+    "fields": {
+      "creator": "Address!",
+      "opponent": "Address",
+      "buyInLamports": "UInt!",
+      "status": "String",
+      "creatorWins": "UInt",
+      "opponentWins": "UInt",
+      "currentRound": "UInt",
+      "winner": "Address",
+      "createdAt": "UInt!",
+      "buyInCurrency": "String!",
+      "lastActivityAt": "UInt"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "@user.address == @newData.creator && ((@newData.buyInCurrency == 'SOL' && (@newData.buyInLamports == @constants.COINFLIP_TIER1_LAMPORTS || @newData.buyInLamports == @constants.COINFLIP_TIER2_LAMPORTS || @newData.buyInLamports == @constants.COINFLIP_TIER3_LAMPORTS)) || (@newData.buyInCurrency == 'MNY' && @newData.buyInLamports > 0)) && @newData.status == 'waiting' && @newData.creatorWins == 0 && @newData.opponentWins == 0 && @newData.currentRound == 1 && @newData.opponent == null && @newData.winner == null && @newData.lastActivityAt == @newData.createdAt",
+      "update": "(@data.status == 'waiting' && @user.address != @data.creator && @newData.opponent == @user.address && @newData.status == 'active' && @newData.creator == @data.creator && @newData.buyInLamports == @data.buyInLamports && @newData.creatorWins == 0 && @newData.opponentWins == 0 && @newData.currentRound == 1 && @newData.winner == null && @newData.createdAt == @data.createdAt && @newData.buyInCurrency == @data.buyInCurrency && @newData.lastActivityAt == @time.now) || (@data.status == 'active' && (@user.address == @data.creator || @user.address == @data.opponent) && @newData.status == 'active' && @newData.creator == @data.creator && @newData.opponent == @data.opponent && @newData.buyInLamports == @data.buyInLamports && @newData.createdAt == @data.createdAt && @newData.winner == null && @newData.creatorWins < 2 && @newData.opponentWins < 2 && (@newData.creatorWins == @data.creatorWins || @newData.creatorWins == @data.creatorWins + 1) && (@newData.opponentWins == @data.opponentWins || @newData.opponentWins == @data.opponentWins + 1) && (@newData.currentRound == @data.currentRound || @newData.currentRound == @data.currentRound + 1) && @newData.buyInCurrency == @data.buyInCurrency && @newData.lastActivityAt == @time.now) || (@data.status == 'active' && (@user.address == @data.creator || @user.address == @data.opponent) && @newData.status == 'complete' && @newData.creator == @data.creator && @newData.opponent == @data.opponent && @newData.buyInLamports == @data.buyInLamports && @newData.createdAt == @data.createdAt && @newData.currentRound == @data.currentRound && ((@newData.creatorWins == 2 && @newData.opponentWins == @data.opponentWins && @newData.winner == @data.creator) || (@newData.opponentWins == 2 && @newData.creatorWins == @data.creatorWins && @newData.winner == @data.opponent)) && @newData.buyInCurrency == @data.buyInCurrency && @newData.lastActivityAt == @data.lastActivityAt) || (@data.status == 'active' && @user.address != null && @newData.status == 'abandoned' && @newData.creator == @data.creator && @newData.opponent == @data.opponent && @newData.buyInLamports == @data.buyInLamports && @newData.buyInCurrency == @data.buyInCurrency && @newData.createdAt == @data.createdAt && @newData.lastActivityAt == @data.lastActivityAt && @newData.currentRound == @data.currentRound && @newData.creatorWins == @data.creatorWins && @newData.opponentWins == @data.opponentWins && @newData.winner == null && @time.now >= @data.lastActivityAt + @constants.RPS_ABANDON_TIMEOUT_SECONDS)",
+      "delete": "@user.address == @data.creator && @data.status == 'waiting' && @data.opponent == null"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@AccountPlugin.createAccount($matchId) && ((@newData.buyInCurrency == 'MNY' && @AccountPlugin.createAccount(@constants.SPIN_POOL_ID) && @TokenPlugin.transfer(@user.address, $matchId, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @newData.buyInLamports)) || (@newData.buyInCurrency == 'SOL' && @AccountPlugin.createAccount(@constants.FEE_POOL_ID) && @TokenPlugin.transfer(@user.address, $matchId, @constants.SOL, @newData.buyInLamports)))",
+        "update": "(@data.status == 'waiting' && @newData.status == 'active' && ((@data.buyInCurrency == 'MNY' && @TokenPlugin.transfer(@user.address, $matchId, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @data.buyInLamports)) || ((@data.buyInCurrency == null || @data.buyInCurrency == 'SOL') && @TokenPlugin.transfer(@user.address, $matchId, @constants.SOL, @data.buyInLamports)))) || (@data.status == 'active' && @newData.status == 'complete' && ((@data.buyInCurrency == 'MNY' && @TokenPlugin.transfer($matchId, @newData.winner, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), (@data.buyInLamports * 2 * 99) // 100) && @TokenPlugin.transfer($matchId, @constants.SPIN_POOL_ID, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), (@data.buyInLamports * 2 * 1) // 100)) || ((@data.buyInCurrency == null || @data.buyInCurrency == 'SOL') && @TokenPlugin.transfer($matchId, @newData.winner, @constants.SOL, (@data.buyInLamports * 2 * 99) // 100) && @TokenPlugin.transfer($matchId, @constants.FEE_POOL_ID, @constants.SOL, (@data.buyInLamports * 2 * 1) // 100)))) || (@data.status == 'active' && @newData.status == 'abandoned' && ((@data.buyInCurrency == 'MNY' && @TokenPlugin.transfer($matchId, @data.creator, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @data.buyInLamports) && @TokenPlugin.transfer($matchId, @data.opponent, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @data.buyInLamports)) || ((@data.buyInCurrency == null || @data.buyInCurrency == 'SOL') && @TokenPlugin.transfer($matchId, @data.creator, @constants.SOL, @data.buyInLamports) && @TokenPlugin.transfer($matchId, @data.opponent, @constants.SOL, @data.buyInLamports)))) || (@data.status == 'active' && @newData.status == 'active')",
+        "delete": "((@data.buyInCurrency == 'MNY' && @TokenPlugin.transfer($matchId, @data.creator, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @data.buyInLamports)) || ((@data.buyInCurrency == null || @data.buyInCurrency == 'SOL') && @TokenPlugin.transfer($matchId, @data.creator, @constants.SOL, @data.buyInLamports)))"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read RPS matches. Used to list waiting matches (lobby), active matches (in-progress), complete matches (history), and abandoned matches (timed-out).",
+      "create": "Any authenticated user creates a 1v1 RPS match as the creator. Must specify buyInCurrency ('SOL' or 'MNY'). For SOL, must pick one of three valid buy-in tiers (COINFLIP_TIER1/2/3_LAMPORTS = 0.01/0.05/0.1 SOL). For MNY, buyInLamports must be greater than 0 in MNY base units. status must initialize to 'waiting', creatorWins=0, opponentWins=0, currentRound=1, opponent=null, winner=null. lastActivityAt must equal createdAt on create. Hook creates per-match escrow PDA via @AccountPlugin.createAccount($matchId), ensures the appropriate fee-pool PDA exists (SPIN_POOL_ID for MNY, FEE_POOL_ID for SOL), and transfers buyInLamports from creator into the escrow in the correct token.",
+      "update": "Four transitions: (a) JOIN — a different user (not the creator) sets opponent=@user.address and status='waiting'->'active'; must set lastActivityAt=@time.now. Hook transfers matching buyInLamports from opponent into the escrow in the match's token (MNY or SOL). (b) ROUND PROGRESS — either player updates creatorWins/opponentWins/currentRound while status remains 'active'; must set lastActivityAt=@time.now. Each counter may only increment by 0 or 1 per update; currentRound may increment by 0 or 1. winner stays null and neither score may reach 2. No onchain transfer fires. (c) COMPLETE — either player flips status 'active'->'complete' when one side reaches 2 round wins; lastActivityAt is preserved (no change). winner must match the side that hit 2. Hook pays 99% of the pot (buyInLamports*2*99//100) from the escrow PDA to the winner and routes the 1% fee (buyInLamports*2*1//100) to the FEE_POOL_ID PDA (SOL) or SPIN_POOL_ID PDA (MNY) — consistent with coinflip fee routing. (d) ABANDON — any authenticated user (either player OR third party) flips status 'active'->'abandoned' once @time.now >= @data.lastActivityAt + RPS_ABANDON_TIMEOUT_SECONDS. All preserved fields must remain unchanged; winner must be null. Hook refunds @data.buyInLamports to BOTH creator and opponent from the escrow PDA in the original currency (MNY or SOL). creator/opponent/buyInLamports/buyInCurrency/createdAt are preserved across all updates.",
+      "delete": "Creator may delete (cancel) the match only while status='waiting' and no opponent has joined. Hook refunds the creator's buyInLamports from the escrow PDA in the original currency (MNY or SOL). Once an opponent joins, the match is non-deletable and must run to completion (or be abandoned after timeout)."
+    },
+    "queries": {
+      "getMatchEscrowAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress($matchId)"
+      },
+      "getFeePoolAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress(@constants.FEE_POOL_ID)"
+      }
+    }
+  },
+  "rpsMatches/$matchId/rounds/$roundNumber": {
+    "description": "Offchain commit-reveal record for a single round of an RPS match. Each player first writes a hash of (move + nonce), then reveals the plaintext move and nonce after both commits are in. Once both reveals are present, either player can compute and set the winner ('creator' | 'opponent' | 'draw') and flip phase to 'complete'. Pure offchain coordination — no SOL movement here; pot is settled by the parent rpsMatches doc when one side reaches 2 round wins.",
+    "fields": {
+      "creatorCommitHash": "String?",
+      "opponentCommitHash": "String?",
+      "creatorMove": "String?",
+      "creatorNonce": "String?",
+      "opponentMove": "String?",
+      "opponentNonce": "String?",
+      "winner": "String?",
+      "phase": "String"
+    },
+    "onchain": false,
+    "rules": {
+      "read": "true",
+      "create": "get(/rpsMatches/$matchId) != null && get(/rpsMatches/$matchId).status == 'active' && (@user.address == get(/rpsMatches/$matchId).creator || @user.address == get(/rpsMatches/$matchId).opponent) && @newData.phase == 'committing' && @newData.creatorMove == null && @newData.opponentMove == null && @newData.creatorNonce == null && @newData.opponentNonce == null && @newData.winner == null",
+      "update": "get(/rpsMatches/$matchId) != null && (@user.address == get(/rpsMatches/$matchId).creator || @user.address == get(/rpsMatches/$matchId).opponent) && ((@user.address == get(/rpsMatches/$matchId).creator && @newData.opponentCommitHash == @data.opponentCommitHash && @newData.opponentMove == @data.opponentMove && @newData.opponentNonce == @data.opponentNonce && ((@data.creatorCommitHash == null && @newData.creatorCommitHash != null && @newData.creatorMove == null && @newData.creatorNonce == null) || (@data.creatorCommitHash != null && @data.creatorMove == null && @newData.creatorCommitHash == @data.creatorCommitHash && @newData.creatorMove != null && @newData.creatorNonce != null))) || (@user.address == get(/rpsMatches/$matchId).opponent && @newData.creatorCommitHash == @data.creatorCommitHash && @newData.creatorMove == @data.creatorMove && @newData.creatorNonce == @data.creatorNonce && ((@data.opponentCommitHash == null && @newData.opponentCommitHash != null && @newData.opponentMove == null && @newData.opponentNonce == null) || (@data.opponentCommitHash != null && @data.opponentMove == null && @newData.opponentCommitHash == @data.opponentCommitHash && @newData.opponentMove != null && @newData.opponentNonce != null))) || (@data.phase == 'revealing' && @data.creatorMove != null && @data.opponentMove != null && @newData.phase == 'complete' && @newData.creatorCommitHash == @data.creatorCommitHash && @newData.opponentCommitHash == @data.opponentCommitHash && @newData.creatorMove == @data.creatorMove && @newData.creatorNonce == @data.creatorNonce && @newData.opponentMove == @data.opponentMove && @newData.opponentNonce == @data.opponentNonce && (@newData.winner == 'creator' || @newData.winner == 'opponent' || @newData.winner == 'draw')) || (@data.phase == 'committing' && @data.creatorCommitHash != null && @data.opponentCommitHash != null && @newData.phase == 'revealing' && @newData.creatorCommitHash == @data.creatorCommitHash && @newData.opponentCommitHash == @data.opponentCommitHash && @newData.creatorMove == @data.creatorMove && @newData.creatorNonce == @data.creatorNonce && @newData.opponentMove == @data.opponentMove && @newData.opponentNonce == @data.opponentNonce && @newData.winner == @data.winner))",
+      "delete": "false"
+    },
+    "operationDetails": {
+      "read": "Anyone can read round commit/reveal records. Used to drive the per-round UI (waiting for opponent commit, waiting for reveals, showing final outcome).",
+      "create": "Either player of the parent rpsMatches doc (creator or opponent) creates a round row while the parent match status is 'active'. phase must initialize to 'committing' and all move/nonce/winner fields must start null. No onchain effect.",
+      "update": "Four transitions, all gated to the two players of the parent match: (a) COMMIT — each player writes only their own commit hash (creatorCommitHash for creator, opponentCommitHash for opponent) while phase is 'committing'. (b) PHASE FLIP — either player flips phase 'committing'→'revealing' once both commit hashes are set. (c) REVEAL — each player writes only their own move + nonce (creatorMove/creatorNonce or opponentMove/opponentNonce) after their commit hash is set; opposing player's fields are untouched. (d) COMPLETE — once both reveals are present, either player sets winner ('creator' | 'opponent' | 'draw') and flips phase 'revealing'→'complete'. The parent rpsMatches doc score is updated separately by the players via its own update path. No onchain effect.",
+      "delete": "Operation disallowed — round records are immutable for match integrity."
+    }
+  },
+  "dailySpinPool/$id": {
+    "description": "Singleton tracking the daily spin prize pool metadata in MNY. The actual MNY tokens live in the SPIN_POOL_ID PDA escrow; this collection tracks balance, total distributed, spin count, and last update timestamp. Onchain to support the getSpinPoolAddress query.",
+    "fields": {
+      "balance": "UInt",
+      "totalDistributed": "UInt",
+      "spinCount": "UInt",
+      "ts": "UInt"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "@user.address == @constants.PROJECT_VAULT_ADDRESS || @user.address == @constants.ADMIN_ADDRESS",
+      "update": "@user.address == @constants.PROJECT_VAULT_ADDRESS || @user.address == @constants.ADMIN_ADDRESS",
+      "delete": "false"
+    },
+    "operationDetails": {
+      "read": "Anyone can read the spin pool metadata (balance, totalDistributed, spinCount, ts).",
+      "create": "Backend vault (PROJECT_VAULT_ADDRESS) or ADMIN_ADDRESS. Initializes the singleton spin pool tracker.",
+      "update": "Backend vault (PROJECT_VAULT_ADDRESS) for normal spin operations, or ADMIN_ADDRESS (directly or via the seedSpinPool seeding hook) to bump the balance when topping up the prize pool.",
+      "delete": "Operation disallowed."
+    },
+    "queries": {
+      "getSpinPoolAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress(@constants.SPIN_POOL_ID)"
+      }
+    }
+  },
+  "dailySpins/$userAddress": {
+    "description": "Tracks per-user daily spin state for cooldown enforcement and cumulative winnings in MNY. Off-chain only.",
+    "fields": {
+      "lastSpinAt": "UInt",
+      "totalWon": "UInt",
+      "spinCount": "UInt"
+    },
+    "onchain": false,
+    "rules": {
+      "read": "@user.address == $userAddress || @user.address == @constants.PROJECT_VAULT_ADDRESS",
+      "create": "@user.address == $userAddress || @user.address == @constants.PROJECT_VAULT_ADDRESS",
+      "update": "@user.address == $userAddress || @user.address == @constants.PROJECT_VAULT_ADDRESS",
+      "delete": "false"
+    },
+    "operationDetails": {
+      "read": "Users can read their own spin record. Backend (PROJECT_VAULT_ADDRESS) can also read for /api/daily-spin route.",
+      "create": "Users create their own spin record on first spin. Backend (PROJECT_VAULT_ADDRESS) can also create on user's behalf via /api/daily-spin route.",
+      "update": "Users update their own spin record after each spin (lastSpinAt, totalWon, spinCount). Backend (PROJECT_VAULT_ADDRESS) can also update via /api/daily-spin route.",
+      "delete": "Operation disallowed."
+    }
+  },
+  "seedSpinPool/$seedId": {
+    "description": "Admin-only seeding records that move MNY tokens from the TPR_TREASURY_ID PDA into the SPIN_POOL_ID PDA to bootstrap or top up the daily spin prize pool. Mirrors the MNY fee pattern used by flashMatches/rpsMatches (which transfer MNY into SPIN_POOL_ID via @TokenPlugin.transfer using @TokenPlugin.getTokenMintAddress(TPR_TOKEN_ID, TPR_NAME, TPR_SYMBOL) as the mint). Onchain create hook ensures SPIN_POOL_ID exists, transfers MNY treasury -> spin pool, then bumps dailySpinPool/main.balance so the UI sees the new pool size. Append-only / immutable.",
+    "fields": {
+      "amount": "UInt!",
+      "createdAt": "UInt!",
+      "createdBy": "Address!"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "(@user.address == @constants.ADMIN_ADDRESS || @user.address == @constants.PROJECT_VAULT_ADDRESS) && @newData.createdBy == @user.address && @newData.amount > 0",
+      "update": "false",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@AccountPlugin.createAccount(@constants.TPR_TREASURY_ID) && @AccountPlugin.createAccount(@constants.SPIN_POOL_ID) && @TokenPlugin.transfer(@constants.TPR_TREASURY_ID, @constants.SPIN_POOL_ID, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @newData.amount) && ((get(/dailySpinPool/main) != null && @DocumentPlugin.updateField(/dailySpinPool/main, 'balance', get(/dailySpinPool/main).balance + @newData.amount)) || get(/dailySpinPool/main) == null)"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read seeding records (admin audit trail of treasury -> spin pool top-ups).",
+      "create": "ADMIN_ADDRESS or PROJECT_VAULT_ADDRESS only (latter allows backend/MCP tools that sign as the project vault to seed the pool). createdBy must equal @user.address and amount must be > 0 (raw MNY base units). Hook ensures TPR_TREASURY_ID and SPIN_POOL_ID PDAs exist, transfers `amount` MNY from TPR_TREASURY_ID to SPIN_POOL_ID using @TokenPlugin.transfer (mint = @TokenPlugin.getTokenMintAddress(TPR_TOKEN_ID, TPR_NAME, TPR_SYMBOL)), then bumps dailySpinPool/main.balance by `amount` if that singleton already exists. If dailySpinPool/main has not yet been initialized by the backend, the onchain MNY transfer still succeeds (treasury -> spin pool); the balance field will be reconciled the next time the spin backend writes to dailySpinPool. Frontend should pass createdAt as Unix seconds and the document ID can be any non-pubkey string (e.g. `seed_{timestamp}_{randomSuffix}`).",
+      "update": "Operation disallowed - seeding records are immutable.",
+      "delete": "Operation disallowed - immutable audit trail."
+    },
+    "queries": {
+      "getTreasuryAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress(@constants.TPR_TREASURY_ID)"
+      },
+      "getSpinPoolAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress(@constants.SPIN_POOL_ID)"
+      }
+    }
+  },
+  "mnyStakes/$stakerAddress": {
+    "description": "MNY token staking positions. One document per staker (document ID = staker wallet address). Stakers receive pro-rata share of hourly SOL fee pool distributions based on amountStaked. Stake increases/decreases happen via update; the delta between @newData.amountStaked and @data.amountStaked drives token transfers between the user wallet and the MNY_STAKE_POOL_ID PDA.",
+    "fields": {
+      "stakerAddress": "Address!",
+      "amountStaked": "UInt",
+      "stakedAt": "UInt",
+      "unstakedAt": "UInt"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "$stakerAddress == @user.address && @newData.stakerAddress == @user.address && @newData.amountStaked > 0",
+      "update": "($stakerAddress == @user.address || @user.address == @constants.PROJECT_VAULT_ADDRESS) && @newData.stakerAddress == @data.stakerAddress",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@AccountPlugin.createAccount(@constants.MNY_STAKE_POOL_ID) && @TokenPlugin.transfer(@user.address, @constants.MNY_STAKE_POOL_ID, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @newData.amountStaked)",
+        "update": "(@newData.amountStaked > @data.amountStaked && @TokenPlugin.transfer(@user.address, @constants.MNY_STAKE_POOL_ID, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @newData.amountStaked - @data.amountStaked)) || (@newData.amountStaked < @data.amountStaked && @TokenPlugin.transfer(@constants.MNY_STAKE_POOL_ID, @user.address, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @data.amountStaked - @newData.amountStaked)) || (@newData.amountStaked == @data.amountStaked)"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read stakes. Public so backend snapshots and frontends can display staker leaderboards and totals.",
+      "create": "Authenticated user creating their own stake doc. Document ID must equal @user.address. Initial amountStaked must be > 0. Hook ensures the MNY_STAKE_POOL_ID PDA exists, then transfers @newData.amountStaked MNY base units from the user to the PDA.",
+      "update": "Staker (or PROJECT_VAULT_ADDRESS for admin/maintenance) updates amountStaked. stakerAddress is immutable post-create. Hook idempotently handles the delta: increases transfer MNY from user to MNY_STAKE_POOL_ID, decreases transfer MNY from MNY_STAKE_POOL_ID back to user, equal values are a no-op. Frontend must update stakedAt on stake increases and unstakedAt on stake decreases. Setting amountStaked to 0 is allowed and effectively unstakes everything.",
+      "delete": "Operation disallowed. Stake records are permanent for audit; users unstake by updating amountStaked to 0."
+    },
+    "queries": {
+      "getStakePoolAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress(@constants.MNY_STAKE_POOL_ID)"
+      },
+      "getMnyMintAddress": {
+        "returnType": "String",
+        "query": "@TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL)"
+      }
+    }
+  },
+  "spinPayouts/$payoutId": {
+    "description": "On-chain payout trigger for daily spin prizes. When the backend creates a record, MNY tokens are atomically transferred from the SPIN_POOL_ID PDA to the winning user's wallet.",
+    "fields": {
+      "recipient": "Address!",
+      "amount": "UInt!",
+      "ts": "UInt!"
+    },
+    "onchain": true,
+    "rules": {
+      "read": "true",
+      "create": "@user.address == @constants.PROJECT_VAULT_ADDRESS && @newData.amount > 0",
+      "update": "false",
+      "delete": "false"
+    },
+    "hooks": {
+      "onchain": {
+        "create": "@TokenPlugin.transfer(@constants.SPIN_POOL_ID, @newData.recipient, @TokenPlugin.getTokenMintAddress(@constants.TPR_TOKEN_ID, @constants.TPR_NAME, @constants.TPR_SYMBOL), @newData.amount)"
+      }
+    },
+    "operationDetails": {
+      "read": "Anyone can read spin payout records.",
+      "create": "Backend-only (PROJECT_VAULT_ADDRESS). Created by /api/daily-spin when a user wins a non-zero prize. Hook transfers MNY from SPIN_POOL_ID PDA to the recipient atomically.",
+      "update": "Operation disallowed — payout records are immutable.",
+      "delete": "Operation disallowed — immutable audit trail."
+    },
+    "queries": {
+      "getSpinPoolAddress": {
+        "returnType": "String",
+        "query": "@AccountPlugin.getAccountAddress(@constants.SPIN_POOL_ID)"
+      }
+    }
+  }
+}
