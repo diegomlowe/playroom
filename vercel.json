@@ -1,11 +1,5 @@
 {
-  "buildCommand": "npx vite build",
+  "buildCommand": "bash build.sh",
   "outputDirectory": "dist",
-  "framework": "vite",
-  "env": {
-    "VITE_TAROBASE_APP_ID": "69f0360a525daf9178c8a6a7",
-    "VITE_CHAIN": "solana_mainnet",
-    "VITE_RPC_URL": "https://api.mainnet-beta.solana.com",
-    "VITE_ENV": "LIVE"
-  }
+  "framework": "vite"
 }
