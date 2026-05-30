@@ -1,5 +1,11 @@
 {
-  "buildCommand": "export VITE_TAROBASE_APP_ID=69f0360a525daf9178c8a6a7 && export VITE_CHAIN=solana_mainnet && export VITE_RPC_URL=https://api.mainnet-beta.solana.com && export VITE_ENV=LIVE && npx vite build",
+  "buildCommand": "npx vite build",
   "outputDirectory": "dist",
-  "framework": "vite"
+  "framework": "vite",
+  "env": {
+    "VITE_TAROBASE_APP_ID": "69f0360a525daf9178c8a6a7",
+    "VITE_CHAIN": "solana_mainnet",
+    "VITE_RPC_URL": "https://api.mainnet-beta.solana.com",
+    "VITE_ENV": "LIVE"
+  }
 }
