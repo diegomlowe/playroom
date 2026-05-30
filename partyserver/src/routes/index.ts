@@ -358,8 +358,9 @@ export function registerRoutes(app: Hono): void {
     // 5. Update global spin pool
     const pool = await getDailySpinPool('main');
     if (pool) {
+      const newBalance = BigInt(pool.balance) - BigInt(prizeBaseUnits);
       const poolSuccess = await setDailySpinPool('main', {
-        balance: Math.max(0n, BigInt(pool.balance) - BigInt(prizeBaseUnits)),
+        balance: (newBalance < 0n ? 0n : newBalance).toString(),
         totalDistributed: (BigInt(pool.totalDistributed || 0) + BigInt(prizeBaseUnits)).toString(),
         ts: nowTs,
       });
