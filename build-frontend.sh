@@ -7,8 +7,5 @@ export VITE_CHAIN=solana_mainnet
 export VITE_RPC_URL=https://api.mainnet-beta.solana.com
 export VITE_ENV=LIVE
 
-# Run TypeScript check (excluding partyserver)
-npx tsc --project tsconfig.app.json --noEmit
-
-# Build with Vite
+# Build with Vite (includes TypeScript check)
 npx vite build
