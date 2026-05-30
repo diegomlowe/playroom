@@ -14,6 +14,7 @@
 import { getManyMnyStakes } from '../collections/mnyStakes.js';
 import { setFeePoolDistributions } from '../collections/feePoolDistributions.js';
 import { runGetFeePoolAddressQueryForFeePoolDistributions } from '../collections/feePoolDistributions.js';
+import { Address } from '../db-client.js';
 
 const MIN_POOL_LAMPORTS = 1000; // Skip distributions if pool < 0.000001 SOL
 
@@ -86,7 +87,7 @@ export async function distributeFeePool(): Promise<void> {
       // and transfers SOL from FEE_POOL_ID PDA to recipient.
       const success = await setFeePoolDistributions(distributionId, {
         epochHour,
-        recipient: staker.stakerAddress,
+        recipient: Address.publicKey(staker.stakerAddress),
         amountLamports: Math.floor((shareNumerator / shareDenominator) * 1), // hint; hook computes real value
         totalPoolLamports: 1, // hint; hook reads real pool balance
         ts: Date.now(),

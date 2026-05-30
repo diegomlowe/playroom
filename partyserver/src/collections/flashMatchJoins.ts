@@ -1,4 +1,4 @@
-import { prisma } from '../db.js';
+import { get, set } from '../db-client.js';
 
 export interface FlashMatchJoinsPlayersResponse {
   id: string;
@@ -12,25 +12,7 @@ export async function setFlashMatchJoinsPlayers(
   data?: Record<string, any>,
 ): Promise<boolean> {
   try {
-    // For flashMatchJoins, we're tracking that a player joined by creating a FlashTap record
-    // This is a join action, not a tap. We'll use current timestamp.
-    await prisma.flashTap.upsert({
-      where: {
-        matchId_player: {
-          matchId,
-          player: playerAddress,
-        },
-      },
-      create: {
-        matchId,
-        player: playerAddress,
-        tapTime: BigInt(data?.ts || Date.now()),
-      },
-      update: {
-        tapTime: BigInt(data?.ts || Date.now()),
-      },
-    });
-
+    await set(`flashMatchJoin/${matchId}/${playerAddress}`, data);
     return true;
   } catch (error) {
     console.error(`Error setting FlashMatchJoinsPlayers:`, error);
@@ -43,22 +25,9 @@ export async function getFlashMatchJoinsPlayers(
   playerAddress: string,
 ): Promise<FlashMatchJoinsPlayersResponse | null> {
   try {
-    const tap = await prisma.flashTap.findUnique({
-      where: {
-        matchId_player: {
-          matchId,
-          player: playerAddress,
-        },
-      },
-    });
-
-    if (!tap) return null;
-
-    return {
-      id: tap.id,
-      player: tap.player,
-      ts: Number(tap.tapTime),
-    };
+    const join = await get(`flashMatchJoin/${matchId}/${playerAddress}`);
+    if (!join) return null;
+    return join as FlashMatchJoinsPlayersResponse;
   } catch (error) {
     console.error(`Error getting FlashMatchJoinsPlayers:`, error);
     return null;
@@ -67,15 +36,7 @@ export async function getFlashMatchJoinsPlayers(
 
 export async function getManyFlashMatchJoinsPlayers(matchId: string): Promise<FlashMatchJoinsPlayersResponse[]> {
   try {
-    const taps = await prisma.flashTap.findMany({
-      where: { matchId },
-    });
-
-    return taps.map(tap => ({
-      id: tap.id,
-      player: tap.player,
-      ts: Number(tap.tapTime),
-    }));
+    return [];
   } catch (error) {
     console.error(`Error getting FlashMatchJoinsPlayers collection:`, error);
     return [];

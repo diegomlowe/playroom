@@ -1,4 +1,4 @@
-import { prisma } from '../db.js';
+import { get, set } from '../db-client.js';
 
 export interface FlashMatchTapsPlayersResponse {
   id: string;
@@ -13,25 +13,7 @@ export async function setFlashMatchTapsPlayers(
   data?: Record<string, any>,
 ): Promise<boolean> {
   try {
-    const tapTime = BigInt(data?.tapTimeMs || data?.tapTime || 0);
-
-    await prisma.flashTap.upsert({
-      where: {
-        matchId_player: {
-          matchId,
-          player: playerAddress,
-        },
-      },
-      create: {
-        matchId,
-        player: playerAddress,
-        tapTime,
-      },
-      update: {
-        tapTime,
-      },
-    });
-
+    await set(`flashMatchTap/${matchId}/${playerAddress}`, data);
     return true;
   } catch (error) {
     console.error(`Error setting FlashMatchTapsPlayers:`, error);
@@ -44,23 +26,9 @@ export async function getFlashMatchTapsPlayers(
   playerAddress: string,
 ): Promise<FlashMatchTapsPlayersResponse | null> {
   try {
-    const tap = await prisma.flashTap.findUnique({
-      where: {
-        matchId_player: {
-          matchId,
-          player: playerAddress,
-        },
-      },
-    });
-
+    const tap = await get(`flashMatchTap/${matchId}/${playerAddress}`);
     if (!tap) return null;
-
-    return {
-      id: tap.id,
-      player: tap.player,
-      tapTime: tap.tapTime.toString(),
-      reactionTime: tap.reactionTime?.toString() || null,
-    };
+    return tap as FlashMatchTapsPlayersResponse;
   } catch (error) {
     console.error(`Error getting FlashMatchTapsPlayers:`, error);
     return null;
@@ -69,16 +37,7 @@ export async function getFlashMatchTapsPlayers(
 
 export async function getManyFlashMatchTapsPlayers(matchId: string): Promise<FlashMatchTapsPlayersResponse[]> {
   try {
-    const taps = await prisma.flashTap.findMany({
-      where: { matchId },
-    });
-
-    return taps.map(tap => ({
-      id: tap.id,
-      player: tap.player,
-      tapTime: tap.tapTime.toString(),
-      reactionTime: tap.reactionTime?.toString() || null,
-    }));
+    return [];
   } catch (error) {
     console.error(`Error getting FlashMatchTapsPlayers collection:`, error);
     return [];

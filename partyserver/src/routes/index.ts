@@ -359,9 +359,9 @@ export function registerRoutes(app: Hono): void {
     const pool = await getDailySpinPool('main');
     if (pool) {
       const poolSuccess = await setDailySpinPool('main', {
-        balance: Math.max(0n, BigInt(pool.balance) - prizeBaseUnits),
-        totalDistributed: (BigInt(pool.totalDistributed || 0) + prizeBaseUnits).toString(),
-          ts: nowTs,
+        balance: Math.max(0n, BigInt(pool.balance) - BigInt(prizeBaseUnits)),
+        totalDistributed: (BigInt(pool.totalDistributed || 0) + BigInt(prizeBaseUnits)).toString(),
+        ts: nowTs,
       });
       if (!poolSuccess) {
         return ApiErrors.internal(c, 'Failed to update spin pool');

@@ -7,7 +7,6 @@ import { registerHeartbeatRoutes } from './heartbeat/index.js';
 import { processQueueBatch, registerQueueRoutes } from './queues/index.js';
 import { registerRoutes } from './routes/index.js';
 import { registerMcpFanoutRoutes } from './lib/poof-mcp-fanout.js';
-import { prisma } from './db.js';
 export { QueueJobTracker } from './lib/poof-queue-job-tracker.js';
 
 const app = new Hono();

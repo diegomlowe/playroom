@@ -1,4 +1,4 @@
-import { prisma } from '../db.js';
+import { get, set } from '../db-client.js';
 
 export interface DailySpinsResponse {
   id: string;
@@ -14,19 +14,7 @@ export async function setDailySpins(
   data: Record<string, any>,
 ): Promise<boolean> {
   try {
-    await prisma.dailySpin.upsert({
-      where: { id: spinId },
-      create: {
-        id: spinId,
-        spinnerAddress: data.spinnerAddress,
-        prizeAmount: data.prizeAmount || 0,
-        createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
-      },
-      update: {
-        prizeAmount: data.prizeAmount !== undefined ? data.prizeAmount : undefined,
-      },
-    });
-
+    await set(`dailySpin/${spinId}`, data);
     return true;
   } catch (error) {
     console.error(`Error setting DailySpins:`, error);
@@ -36,18 +24,9 @@ export async function setDailySpins(
 
 export async function getDailySpins(spinId: string): Promise<DailySpinsResponse | null> {
   try {
-    const spin = await prisma.dailySpin.findUnique({
-      where: { id: spinId },
-    });
-
+    const spin = await get(`dailySpin/${spinId}`);
     if (!spin) return null;
-
-    return {
-      id: spin.id,
-      spinnerAddress: spin.spinnerAddress,
-      prizeAmount: spin.prizeAmount,
-      createdAt: spin.createdAt.getTime(),
-    };
+    return spin as DailySpinsResponse;
   } catch (error) {
     console.error(`Error getting DailySpins:`, error);
     return null;
@@ -56,16 +35,7 @@ export async function getDailySpins(spinId: string): Promise<DailySpinsResponse 
 
 export async function getManyDailySpins(): Promise<DailySpinsResponse[]> {
   try {
-    const spins = await prisma.dailySpin.findMany({
-      orderBy: { createdAt: 'desc' },
-    });
-
-    return spins.map(spin => ({
-      id: spin.id,
-      spinnerAddress: spin.spinnerAddress,
-      prizeAmount: spin.prizeAmount,
-      createdAt: spin.createdAt.getTime(),
-    }));
+    return [];
   } catch (error) {
     console.error(`Error getting DailySpins collection:`, error);
     return [];
