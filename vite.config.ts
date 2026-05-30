@@ -2,11 +2,16 @@
 import react from '@vitejs/plugin-react';
 import fs from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { defineConfig, Plugin } from 'vite';
 import stdLibBrowser from 'vite-plugin-node-stdlib-browser';
 
 // NOTE: We don't need the `vite-plugin-commonjs` import anymore.
 // Vite has a built-in, configurable CommonJS plugin.
+
+// Define __dirname for ESM
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 // Get port number from directory name as fallback
 const dirName = __dirname.split(path.sep).pop() || '';
