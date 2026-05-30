@@ -199,7 +199,7 @@ export function registerRoutes(app: Hono): void {
     const flashMomentMs = Date.now() + delayMs;
 
     const success = await updateFlashMatches(matchId, {
-      creator: match.creator),
+      creator: match.creator,
       playerCount: match.playerCount,
       state: 'playing',
       flashMomentMs,
@@ -283,13 +283,13 @@ export function registerRoutes(app: Hono): void {
     }
 
     const success = await updateFlashMatches(matchId, {
-      creator: match.creator),
+      creator: match.creator,
       playerCount: match.playerCount,
       state: 'resolved',
       flashMomentMs,
       winner: winner,
       winnerDeltaMs,
-      secondPlace: secondPlace ? secondPlace) : undefined,
+      secondPlace: secondPlace ? secondPlace : undefined,
       secondPlaceDeltaMs: secondPlaceDelta === Number.MAX_SAFE_INTEGER ? 0 : secondPlaceDelta,
       ts: match.ts,
       buyIn: (match as any).buyIn,
@@ -372,7 +372,7 @@ export function registerRoutes(app: Hono): void {
     if (prizeBaseUnits > 0) {
       const payoutId = `spin_${nowTs}_${walletAddress.slice(0, 8)}`;
       const payoutSuccess = await setSpinPayouts(payoutId, {
-        recipient: walletAddress),
+        recipient: walletAddress,
         amount: prizeBaseUnits,
         ts: nowTs,
       });
@@ -429,8 +429,8 @@ export function registerRoutes(app: Hono): void {
     const success = await updateCoinFlipMatches(matchId, {
       state: 'resolved',
       winner: winner,
-      creator: match.creator),
-      opponent: match.opponent),
+      creator: match.creator,
+      opponent: match.opponent,
       tier: match.tier,
       buyIn: match.buyIn,
       ts: match.ts,

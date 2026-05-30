@@ -67,6 +67,10 @@ export async function setGames(gameId: string, data: Record<string, any>): Promi
   }
 }
 
+export async function updateGames(gameId: string, data: Record<string, any>): Promise<boolean> {
+  return setGames(gameId, data);
+}
+
 export async function getGames(gameId: string): Promise<GamesResponse | null> {
   try {
     const game = await prisma.game.findUnique({
