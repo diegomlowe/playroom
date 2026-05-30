@@ -233,7 +233,7 @@ export function registerRoutes(app: Hono): void {
       return ApiErrors.badRequest(c, `Match not in playing state (current: ${match.state})`);
     }
 
-    const flashMomentMs = match.flashMomentMs as number;
+    const flashMomentMs = Number(match.flashMomentMs || 0);
     const now = Date.now();
 
     // Allow 30 seconds from flash moment before resolving anyway
@@ -359,8 +359,8 @@ export function registerRoutes(app: Hono): void {
     const pool = await getDailySpinPool('main');
     if (pool) {
       const poolSuccess = await setDailySpinPool('main', {
-        balance: Math.max(0, pool.balance - prizeBaseUnits),
-        totalDistributed: pool.totalDistributed + prizeBaseUnits,
+        balance: Math.max(0n, BigInt(pool.balance) - prizeBaseUnits),
+        totalDistributed: (BigInt(pool.totalDistributed || 0) + prizeBaseUnits).toString(),
           ts: nowTs,
       });
       if (!poolSuccess) {

@@ -12,11 +12,8 @@ export { QueueJobTracker } from './lib/poof-queue-job-tracker.js';
 
 const app = new Hono();
 
-// Database initialization
-app.use('*', async (c, next) => {
-  c.set('db', prisma);
-  await next();
-});
+// Database initialization (prisma imported directly in routes)
+// No need for middleware since routes import prisma from ./db.js
 
 // Global middleware
 // CORS is initialized lazily on first request to ensure process.env is populated

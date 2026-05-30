@@ -86,10 +86,10 @@ export async function distributeFeePool(): Promise<void> {
       // and transfers SOL from FEE_POOL_ID PDA to recipient.
       const success = await setFeePoolDistributions(distributionId, {
         epochHour,
-        recipient: Address.publicKey(staker.stakerAddress),
+        recipient: staker.stakerAddress,
         amountLamports: Math.floor((shareNumerator / shareDenominator) * 1), // hint; hook computes real value
         totalPoolLamports: 1, // hint; hook reads real pool balance
-        ts: Time.Now as any,
+        ts: Date.now(),
         stakedAmountBaseUnits: staker.amountStaked,
         totalStakedAmountBaseUnits: totalStaked,
       });
