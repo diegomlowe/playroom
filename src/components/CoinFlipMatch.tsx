@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useAuth } from "@/hooks/useAuth";;
+import { useAuth } from "@/hooks/useAuth";
+import { getIdToken } from '@pooflabs/web';
 import { toast } from 'sonner';
 import { PageLayout } from '@/components/poof-ui';
 import { Particles } from '@/components/effects';

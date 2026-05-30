@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useAuth } from "@/hooks/useAuth";;
+import { useAuth } from "@/hooks/useAuth";
+import { getIdToken } from '@pooflabs/web';
 import { toast } from 'sonner';
 import { setGameSubmissionsPlayers } from '@/lib/collections/gameSubmissions';
 import { createAuthenticatedApiClient } from '@/lib/api-client';

@@ -24,13 +24,11 @@ import { WalletProvider } from '@solana/wallet-adapter-react';
 import { PhantomWalletAdapter } from '@solana/wallet-adapter-phantom';
 
 function App(): JSX.Element {
-  const network = WalletAdapterNetwork.Mainnet;
-  const endpoint = 'https://api.mainnet-beta.solana.com';
   const wallets = [new PhantomWalletAdapter()];
 
   return (
     <ThemeProvider>
-      <WalletProvider wallets={wallets} autoConnect endpoint={endpoint} network={network}>
+      <WalletProvider wallets={wallets} autoConnect={true}>
         {/* NOTE: UI Generator - Uncomment OAuthProvider wrapper below if OAuth functionality is needed.
             See .claude/skills/oauth/docs/implementation-guide.md for OAuth implementation guide. */}
         {/* <OAuthProvider> */}
